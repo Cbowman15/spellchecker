@@ -14,9 +14,9 @@ class ReferenceFile():
 
 class Suggester():
     def __init__(self, known_words=None):
-        self.known_words = known_words or {}
+        self.known_words = known_words or set()
     def checker(self, word):
-        if word is self.known_words:
+        if word in self.known_words:
             return True
         else:
             return False
