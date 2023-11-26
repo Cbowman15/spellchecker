@@ -29,7 +29,7 @@ class TextFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
-        <whatever method>
+        return self.text.split()
 
 class HTMLFile(ReferenceFile):
     def __init__(self, text):
