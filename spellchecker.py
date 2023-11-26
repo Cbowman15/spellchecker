@@ -1,16 +1,16 @@
 
 
 class Spellchecker():
-    def __init__(self):
-        <>
-    def spell_check(self, ReferenceFile):
-        <>
+    def __init__(self, reference_file):
+        self.reference_file = reference_file
+    def spell_check(self):
+        words_to_check = self.reference_file.parse()
 
 class ReferenceFile():
     def __init__(self, text):
         self.text = text
     def parse(self):
-        <>
+        pass
 
 class Suggester():
     def __init__(self, known_words=None):
