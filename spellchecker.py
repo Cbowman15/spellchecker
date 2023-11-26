@@ -1,4 +1,6 @@
 
+from bs4 import BeautifulSoup
+import PyPDF2
 
 class Spellchecker():
     def __init__(self, reference_file):
@@ -33,7 +35,9 @@ class HTMLFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
-        <BeautifulSoup>
+        soup = BeautifulSoup(self.text, "lxml")
+        content = soup.get_text()
+        return content.split()
 
 class PDFFile(ReferenceFile):
     def __init__(self, text):
