@@ -1,12 +1,24 @@
 
+import bs4
 from bs4 import BeautifulSoup
+import PyPDF2
 from PyPDF2 import PdfReader
 
 class Spellchecker():
-    def __init__(self, reference_file):
+    def __init__(self, reference_file, known_words_file):
         self.reference_file = reference_file
+        self.known_words = self.get_known_words(known_words_file)
+        self.unknown_word_count = 0
     def spell_check(self):
-        words_to_check = self.reference_file.parse()
+        words_to_check = self.reference_file.get_parsed_content()
+        for word in words_to_check:
+            if word not in self.known_words:
+                <graphical interface>
+                self.unknown_word_count += 1
+    def get_known_words(self, known_words_file):
+        with open(known_words_file, "rt") as known_file:
+            return set(known_file.read().split())
+
 
 class ReferenceFile():
     def __init__(self, text):
@@ -49,3 +61,5 @@ class PDFFile(ReferenceFile):
             page = pdf_reader.pages[num]
             pdf_content += page.extract_text()
         return pdf_content.split()
+    
+known_words_file = "words.txt"
