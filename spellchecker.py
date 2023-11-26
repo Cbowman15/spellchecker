@@ -13,12 +13,15 @@ class ReferenceFile():
         <>
 
 class Suggester():
-    def __init__(self, known_words):
-        <>
+    def __init__(self, known_words=None):
+        self.known_words = known_words or {}
     def checker(self, word):
-        <>
+        if word is self.known_words:
+            return True
+        else:
+            return False
     def suggestions(self, word):
-        <>
+        "<Levenshtein, for later>"
 
 class TextFile(ReferenceFile):
     def __init__(self, text):
