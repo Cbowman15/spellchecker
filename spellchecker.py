@@ -14,7 +14,7 @@ class Spellchecker():
         words_to_check = self.reference_file.parse() #check this phrase
         for word in words_to_check:
             if word not in self.known_words:
-                suggestions = Suggester.get_suggestions(word, self.known_words)
+                suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
                 <graphical interface> #work on GUI, but get Levenshtein first
                 self.unknown_word_count += 1
     def get_known_words(self, known_words_file):
