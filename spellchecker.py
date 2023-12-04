@@ -5,6 +5,7 @@ import PyPDF2
 from PyPDF2 import PdfReader
 import tkinter as tk
 import Levenshtein
+import re
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
         self.reference_file = reference_file
@@ -133,19 +134,23 @@ class SpellcheckerApp:
             self.highlight_unknown()
 
     def highlight_unknown(self):
+        def remove_punct(word):
+            return word.rstrip('.?!:') in self.spellchecker.known_words
         start_text = "1.0"
         end_text = tk.END
         self.text.tag_remove("highlight", start_text, end_text)
-        if not self.unknown_words:
-            return
-        unknown_word = self.unknown_words[self.current_unknown_index]
-        start_text = self.text.search(r'\y{}\y'.format(unknown_word), start_text, end_text, regexp=True)
+        for line_num in range(1, int(self.text.index(tk.END).split('.')[0])+1):
+            line_start= "{}.0".format(line_num)
+            line_end= "{}.end".format(line_num)
+            line_text = self.text.get(line_start, line_end)
+            for word in re.findall(r'\b\w+[.?!:]?\b', line_text):
+                if not remove_punct(word):
+                    start_pos = self.text.search(r'\y{}\y'.format(word), line_start, line_end, regexp=True)
+                    while start_pos:
+                        end_pos = self.text.index('{}+{}c'.format(start_pos, len(word)))
+                        self.text.tag_add("highlight", start_pos, end_pos)
+                        start_pos=self.text.search('r\y{}\y'.format(word), end_pos, line_end, regexp=True)
         self.text.tag_config("highlight", background="yellow")
-        while start_text:
-            end_text = self.text.index('{}+{}c'.format(start_text, len(unknown_word)))
-            self.text.tag_add("highlight", start_text, end_text)
-            start_text = self.text.search(r'\y{}\y'.format(unknown_word), end_text, end_text, regexp=True)
-
     def ignore_unknown(self):
         unknown_word = self.unknown_words[self.current_unknown_index]
         self.unknown_words.remove(unknown_word)
