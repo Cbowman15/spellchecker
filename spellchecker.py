@@ -93,7 +93,7 @@ class PDFFile(ReferenceFile):
         return pdf_content.split()
 
 class SpellcheckerApp:
-    def __init__(self, window):
+    def __init__(self, window, spellchecker):
         self.window = window
         self.window.title("Spellchecker EECE2140")
         self.frm = tk.Frame(self.window)
@@ -104,7 +104,19 @@ class SpellcheckerApp:
         self.current_unknown_index = 0
         self.btn_next_unknown = tk.Button(self.frm, text="NEXT UNKNOWN", command=self.next_unknown)
         self.btn_next_unknown.pack()
+        self.spellchecker = spellchecker
+        self.text.bind("<Button-3>", self.show_menu)
+        self.text.bind("<Enter>", self.show_menu)
 
+    def show_menu(self, event):
+        if self.unknown_words:
+            unknown_word = self.unknown_words[self.current_unknown_index]
+            menu = tk.Menu(self.text, tearoff=1)
+            menu.add_command(label="Ignore", command=self.ignore_unknown)
+            menu.add_command(label="Accept Suggestion", command=self.accept_suggestion)
+            menu.add_command(label="Delete", command=self.delete_unknown)
+            menu.post(event.x_root, event.y_root)
+            
     def next_unknown(self):
         if self.unknown_words:
             if self.current_unknown_index < (len(self.unknown_words)-1):
@@ -125,9 +137,19 @@ class SpellcheckerApp:
             self.text.tag_add("highlight", start_text, end_text)
             start_text = self.text.search(r'\y{}\y'.format(unknown_word), end_text, end_text, regexp=True)
 
-
+    def ignore_unknown(self):
+        <>
+    
+    def accept_suggestion(self):
+        <>
+    
+    def delete_unknown(self):
+        <>
 
 
 known_words_file = "words.txt"
 sim_scores_file = "similarity_scores.py"
+window = tk.Tk()
+spellchecker = Spellchecker(TextFile(""),known_words_file,sim_scores_file)
+window.mainloop()
 #rest of globals
