@@ -15,7 +15,6 @@ class Spellchecker():
         for word in words_to_check:
             if word not in self.known_words:
                 suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
-                <graphical interface> #work on GUI, but get Levenshtein first
                 self.unknown_word_count += 1
     def get_known_words(self, known_words_file):
         with open(known_words_file, "rt") as known_file:
@@ -97,10 +96,34 @@ class SpellcheckerApp:
     def __init__(self, window):
         self.window = window
         self.window.title("Spellchecker EECE2140")
-        self.text = tk.Text(self.window, wrap="word", width=100, height=100)
+        self.frm = tk.Frame(self.window)
+        self.frm.pack()
+        self.text = tk.Text(self.frm, wrap="word", width=100, height=100)
         self.text.pack()
-        
+        self.unknown_words = []
+        self.current_unknown_index = 0
+        self.btn_next_unknown = tk.Button(self.frm, text="NEXT UNKNOWN", command=self.next_unknown)
+        self.btn_next_unknown.pack()
 
+    def next_unknown(self):
+        if self.unknown_words:
+            if self.current_unknown_index < (len(self.unknown_words)-1):
+                self.current_unknown_index += 1
+            else:
+                self.current_unknown_index = 0
+            self.highlight_unknown()
+
+    def highlight_unknown(self):
+        start_text = "1.0"
+        end_text = tk.END
+        self.text.tag_remove("highlight", start_text, end_text)
+        unknown_word = self.unknown_words[self.current_unknown_index]
+        start_text = self.text.search(r'\y{}\y'.format(unknown_word), start_text, end_text, regexp=True)
+        self.text.tag_config("highlight", bg="yellow")
+        while start_text:
+            end_text = self.text.index('{}+{}c'.format(start_text, len(unknown_word)))
+            self.text.tag_add("highlight", start_text, end_text)
+            start_text = self.text.search(r'\y{}\y'.format(unknown_word), end_text, end_text, regexp=True)
 
 
 
