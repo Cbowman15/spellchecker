@@ -104,31 +104,41 @@ class SpellcheckerApp:
 
         with open("example.txt", 'rt') as example_text_file:
             text_content = example_text_file.read()
-            self.text.insert(tk.END, text_content)
+            
 
+        text_content = ' ' + text_content
+        self.text.insert(tk.END, text_content)
         self.unknown_words = []
         self.current_unknown_index = 0
         self.btn_next_unknown = tk.Button(self.frm, text="NEXT UNKNOWN", command=self.next_unknown)
         self.btn_next_unknown.pack()
         self.spellchecker = spellchecker
+        self.text.tag_config("highlight", background="yellow")
+        self.text.tag_config("selected", background="blue")
         self.text.bind("<Button-3>", self.show_menu)
         self.text.bind("<ButtonRelease-3>", self.show_menu)
-        self.text.tag_config("highlight", background="yellow")
-        self.text.tag_config("selected", background="lightblue")
-        self.text.tag_bind("highlight", "ButtonRelease-3>", self.show_menu)
+        self.text.tag_bind("highlight", "<Button-3>", self.show_menu)
+        self.text.tag_bind("selected", "<ButtonRelease-3>", self.show_menu)
         spellchecker.spell_check()
         self.highlight_unknown()
 
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
         word = self.text.get(curr_index+" wordstart", curr_index+" wordend")
-        self.text.tag_remove("highlight", curr_index+" wordstart", curr_index+" wordend")
-        if word in self.unknown_words:
-            menu = tk.Menu(self.text, tearoff=1)
-            menu.add_command(label="Ignore", command=self.ignore_unknown)
-            menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
-            menu.add_command(label="Delete", command=self.delete_unknown)
-            menu.post(event.x_root, event.y_root)
+        self.text.tag_remove("selected", "1.0", tk.END)
+        if "highlight" in self.text.tag_names(curr_index):
+            self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
+            self.text.tag_config("selected", background="blue")
+            if word in self.unknown_words:
+                self.text.tag_remove("highlight", curr_index+" wordstart", curr_index+" wordend")
+                if self.text.tag_ranges("highlight") and (curr_index in self.text.tag_ranges("highlight")):
+                    self.text.tag_configure("selected", background="blue")
+                    self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
+                    menu = tk.Menu(self.text, tearoff=1)
+                    menu.add_command(label="Ignore", command=self.ignore_unknown)
+                    menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
+                    menu.add_command(label="Delete", command=self.delete_unknown)
+                    menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
         if self.unknown_words:
@@ -140,7 +150,7 @@ class SpellcheckerApp:
 
     def highlight_unknown(self):
         def remove_punct(word):
-            return word.rstrip('.?!:') in self.spellchecker.known_words
+            return word.rstrip('.?!:\n ') in self.spellchecker.known_words and word.lstrip('.?!:\n ') in self.spellchecker.known_words
         start_text = "1.0"
         end_text = tk.END
         self.text.tag_remove("highlight", start_text, end_text)
