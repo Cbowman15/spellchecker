@@ -112,16 +112,21 @@ class SpellcheckerApp:
         self.btn_next_unknown.pack()
         self.spellchecker = spellchecker
         self.text.bind("<Button-3>", self.show_menu)
-        self.text.bind("<Enter>", self.show_menu)
+        self.text.bind("<ButtonRelease-3>", self.show_menu)
+        self.text.tag_config("highlight", background="yellow")
+        self.text.tag_config("selected", background="lightblue")
+        self.text.tag_bind("highlight", "ButtonRelease-3>", self.show_menu)
         spellchecker.spell_check()
         self.highlight_unknown()
 
     def show_menu(self, event):
-        if self.unknown_words:
-            unknown_word = self.unknown_words[self.current_unknown_index]
+        curr_index = self.text.index(tk.CURRENT)
+        word = self.text.get(curr_index+" wordstart", curr_index+" wordend")
+        self.text.tag_remove("highlight", curr_index+" wordstart", curr_index+" wordend")
+        if word in self.unknown_words:
             menu = tk.Menu(self.text, tearoff=1)
             menu.add_command(label="Ignore", command=self.ignore_unknown)
-            menu.add_command(label="Accept Suggestion", command=self.accept_suggestion)
+            menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
             menu.add_command(label="Delete", command=self.delete_unknown)
             menu.post(event.x_root, event.y_root)
 
