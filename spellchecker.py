@@ -4,18 +4,12 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
 import tkinter as tk
-
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
         self.reference_file = reference_file
         self.known_words = self.get_known_words(known_words_file)
         self.unknown_word_count = 0 #remember to print at the end
         self.sim_score = self.get_sim_score(sim_score_file)
-        self.window = tk.Tk()
-        self.text = tk.Text(self.window)
-        self.text.pack(expand=True, fill='both')
-        self.text.insert("1.0", self.reference_file.text)
-
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
         for word in words_to_check:
@@ -23,8 +17,6 @@ class Spellchecker():
                 suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
                 <graphical interface> #work on GUI, but get Levenshtein first
                 self.unknown_word_count += 1
-    def get_unknown_word_count(self):
-        return self.unknown_word_count
     def get_known_words(self, known_words_file):
         with open(known_words_file, "rt") as known_file:
             return set(known_file.read().split())
@@ -100,7 +92,19 @@ class PDFFile(ReferenceFile):
             page = pdf_reader.pages[num]
             pdf_content += page.extract_text()
         return pdf_content.split()
-    
+
+class SpellcheckerApp:
+    def __init__(self, window):
+        self.window = window
+        self.window.title("Spellchecker EECE2140")
+        self.text = tk.Text(self.window, wrap="word", width=100, height=100)
+        self.text.pack()
+        
+
+
+
+
+
 known_words_file = "words.txt"
 sim_scores_file = "similarity_scores.py"
 #rest of globals
