@@ -3,6 +3,7 @@ import bs4 #may not have downloaded correctly? (yellow underline)
 from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
+import tkinter as tk
 
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
@@ -10,6 +11,11 @@ class Spellchecker():
         self.known_words = self.get_known_words(known_words_file)
         self.unknown_word_count = 0 #remember to print at the end
         self.sim_score = self.get_sim_score(sim_score_file)
+        self.window = tk.Tk()
+        self.text = tk.Text(self.window)
+        self.text.pack(expand=True, fill='both')
+        self.text.insert("1.0", self.reference_file.text)
+
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
         for word in words_to_check:
@@ -17,6 +23,8 @@ class Spellchecker():
                 suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
                 <graphical interface> #work on GUI, but get Levenshtein first
                 self.unknown_word_count += 1
+    def get_unknown_word_count(self):
+        return self.unknown_word_count
     def get_known_words(self, known_words_file):
         with open(known_words_file, "rt") as known_file:
             return set(known_file.read().split())
