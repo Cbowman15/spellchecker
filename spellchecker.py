@@ -6,6 +6,7 @@ from PyPDF2 import PdfReader
 import tkinter as tk
 import Levenshtein
 import re
+import time
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
         self.reference_file = reference_file
@@ -135,23 +136,31 @@ class SpellcheckerApp:
         self.text.bind("<Right>", self.arrow_key_move)
         self.text.bind("<Up>", self.on_arrow_mode)
         self.text.bind("<Down>", self.off_arrow_mode)
+        self.text.bind("<Shift-Left>", self.overload_shift)
+        self.text.bind("<Shift-Right>", self.overload_shift)
+        self.text.bind("<Shift-Up>", self.overload_shift)
+        self.text.bind("<Shift-Down>", self.overload_shift)
+        self.text.bind("<KeyPress>", self.keypress_action)
+        self.text.bind("<KeyRelease>", self.keyrelease_action)
+        self.curr_word_pos = None
+        self.timer_delay = None
+        self.time_delay = 5000
         spellchecker.spell_check()
         self.highlight_unknown()
 
     def on_arrow_mode(self, event):
-        if not self.arrow_key_mode:
+        if not self.arrow_key_mode and (event.state & 0x1):
             self.arrow_key_count += 1
             if self.arrow_key_count >= self.arrow_key_req:
                 self.arrow_key_mode = True
                 self.arrow_key_count = 0
     
     def off_arrow_mode(self, event):
-        if self.arrow_key_mode:
+        if self.arrow_key_mode and (event.state & 0x1):
             self.arrow_key_count += 1
             if self.arrow_key_count >= self.arrow_key_req:
                 self.arrow_key_mode=False
                 self.arrow_key_count = 0
-
 
     def arrow_key_move(self, event):
         if self.arrow_key_mode:
@@ -162,17 +171,32 @@ class SpellcheckerApp:
             else:
                 pass
 
+    def overload_shift(self, event):
+        if event.keysym == "Up" and (event.state & 0x1):
+            self.on_arrow_mode(event)
+            return "break"
+        elif event.keysym == "Down" and (event.state & 0x1):
+            self.off_arrow_mode(event)
+            return "break"
+        else:
+            return "break"
+        
+
     def keypress_action(self, event):
-        self.text.edit_separator()
+        if self.timer_delay:
+            self.window.after_cancel(self.timer_delay)
+        self.timer_delay = self.window.after(self.time_delay, self.processing_event)
     
     def keyrelease_action(self, event):
-        self.text.edit_separator()
-        self.text.after(1, self.processing_event)
+        if self.timer_delay:
+            self.window.after_cancel(self.timer_delay)
+        self.timer_delay = self.window.after(self.time_delay, self.processing_event)
     
     def processing_event(self):
         if self.text.edit_modified():
             self.text.edit_modified(0)
             self.highlight_unknown()
+            self.timer_delay = None
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
         word = self.text.get(curr_index+" wordstart", curr_index+" wordend")
@@ -191,7 +215,7 @@ class SpellcheckerApp:
                     menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
-        if self.initial and self.highlight_indexes:
+        if self.highlight_indexes:
             self.text.tag_config("highlight", background="yellow")
             self.initial = False
         else:
@@ -200,17 +224,21 @@ class SpellcheckerApp:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            self.text.mark_set(tk.INSERT, start_index)
-            self.highlight_unknown()
+            self.set_insertion(start_index)
+            for index, (start, end) in enumerate(self.highlight_indexes):
+                if index != self.current_unknown_index:
+                    self.text.tag_add("highlight", start, end)
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
+            self.text.tag_config("highlight", background="yellow")
+        
             
     def previous_unknown(self):
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            self.text.mark_set(tk.INSERT, start_index)
+            self.set_insertion(start_index)
             self.text.tag_remove("highlight", "1.0", tk.END)
             for index, (start, end) in enumerate(self.highlight_indexes):
                 if index != self.current_unknown_index:
@@ -218,27 +246,50 @@ class SpellcheckerApp:
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
+        
+    
+    def set_insertion(self, pos):
+        prev_whitespace = self.text.search(r'\s', pos, backwards=True, regexp=True)
+        if self.arrow_key_mode:
+            if self.text.compare(tk.INSERT, '>', pos):
+                self.text.mark_set(tk.INSERT, "{}+1c".format(pos))
+            else:
+                self.text.mark_set(tk.INSERT, "{}-1c".format(pos))
+        else:
+            self.text.mark_set(tk.INSERT, pos)
 
 
     def highlight_unknown(self):
-        def remove_punct(word):
-            return word.rstrip('.?!:\n ') in self.spellchecker.known_words and word.lstrip('.?!:\n ') in self.spellchecker.known_words
-        self.text.tag_remove("highlight", "1.0", tk.END)
-        self.highlight_indexes = []
-        for line_num in range(1, int(self.text.index(tk.END).split('.')[0])+1):
-            line_start= "{}.0".format(line_num)
-            line_end= "{}.end".format(line_num)
-            line_text = self.text.get(line_start, line_end)
-            for match in re.finditer(r'\b\w+[.?!:]?\b', line_text):
-                word=match.group()
-                if not remove_punct(word):
-                    start_pos = "{}+{}c".format(line_start, match.start())
-                    end_pos = "{}+{}c".format(line_start, match.end())
-                    self.highlight_indexes.append((start_pos, end_pos))
-        for index, (start_index, end_index) in enumerate(self.highlight_indexes):
-            if index != self.current_unknown_index:
-                self.text.tag_add("highlight", start_index, end_index)
-                self.text.tag_config("highlight", background="yellow")
+        curr_time = time.time()
+        if self.arrow_key_mode and (curr_time-self.arrow_last_time>self.arrow_time_reset):
+            self.arrow_key_mode = False
+        if not self.arrow_key_mode:
+            curr_index = self.text.index(tk.INSERT)
+            curr_line_num = int(curr_index.split('.')[0])
+            self.text.tag_remove("highlight", "1.0", tk.END)
+            now_known_indexes = []
+            for line_num in range(1, int(self.text.index(tk.END).split('.')[0])+1):
+                line_start= "{}.0".format(line_num)
+                line_end= "{}.end".format(line_num)
+                line_text = self.text.get(line_start, line_end)
+                for match in re.finditer(r'\b[^\W\n]+[.?!:]?\b', line_text):
+                    word=match.group()
+                    if word not in self.spellchecker.known_words:
+                        start_pos = "{}+{}c".format(line_start, match.start())
+                        end_pos = "{}+{}c".format(line_start, match.end())
+                        self.text.tag_add("highlight", start_pos, end_pos)
+                        now_known_indexes.append((start_pos, end_pos))
+            self.highlight_indexes = now_known_indexes
+            self.current_unknown_index = (len(self.highlight_indexes)-1)
+            for index, (start_index, end_index) in enumerate(self.highlight_indexes):
+                if index!=self.current_unknown_index:
+                    self.text.tag_add("highlight", start_index, end_index)
+                    self.text.tag_config("highlight", background="yellow")
+            curr_highlight_area  = len(self.text.get(curr_index+" wordstart", curr_index+" wordend"))
+            curr_index = "{}.{}".format(curr_line_num, curr_highlight_area)
+            self.text.tag_add("highlight", curr_index+" wordstart", curr_index+" wordend")
+            self.set_insertion(curr_index)
+            
     def ignore_unknown(self):
         unknown_word = self.unknown_words[self.current_unknown_index]
         self.unknown_words.remove(unknown_word)
@@ -278,14 +329,15 @@ class SpellcheckerApp:
         self.unknown_word_count -= 1
         self.next_unknown()
 
-with open("example.txt", 'rt') as example_text_file:
-    text_content = example_text_file.read()
+if __name__ == "__main__":
+    with open("example.txt", 'rt') as example_text_file:
+        text_content = example_text_file.read()
 
-reference_file = TextFile(text_content)
-known_words_file = "words.txt"
-sim_scores_file = "similarity_scores.py"
-window = tk.Tk()
-spellchecker = Spellchecker(reference_file,known_words_file,sim_scores_file)
-app = SpellcheckerApp(window, spellchecker)
-window.mainloop()
+    reference_file = TextFile(text_content)
+    known_words_file = "words.txt"
+    sim_scores_file = "similarity_scores.py"
+    window = tk.Tk()
+    spellchecker = Spellchecker(reference_file,known_words_file,sim_scores_file)
+    app = SpellcheckerApp(window, spellchecker)
+    window.mainloop()
 #rest of globals
