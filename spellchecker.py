@@ -222,11 +222,12 @@ class SpellcheckerApp:
                 if self.text.tag_ranges("highlight") and (curr_index in self.text.tag_ranges("highlight")):
                     self.text.tag_configure("selected", background="blue")
                     self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
-                    menu = tk.Menu(self.text, tearoff=1)
-                    menu.add_command(label="Ignore", command=self.ignore_unknown)
-                    menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
-                    menu.add_command(label="Delete", command=self.delete_unknown)
-                    menu.post(event.x_root, event.y_root)
+            if "selected" in self.text.tag_names(curr_index):
+                menu = tk.Menu(self.text, tearoff=1)
+                menu.add_command(label="Ignore", command=self.ignore_unknown)
+                menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
+                menu.add_command(label="Delete", command=self.delete_unknown)
+                menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
         if self.highlight_indexes:
