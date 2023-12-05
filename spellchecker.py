@@ -25,7 +25,7 @@ class Spellchecker():
         with open(sim_score_file, 'rt') as sim_score_file:
             sim_score = {}
             exec(sim_score_file.read(), {}, sim_score)
-            print("sim_score:", sim_score)
+            print("sim_score:", "hi")
         return sim_score
 
 
@@ -105,12 +105,17 @@ class SpellcheckerApp:
         with open("example.txt", 'rt') as example_text_file:
             text_content = example_text_file.read()
             
-
         text_content = ' ' + text_content
         self.text.insert(tk.END, text_content)
+        self.initial = True
         self.unknown_words = []
         self.current_unknown_index = 0
-        self.btn_next_unknown = tk.Button(self.frm, text="NEXT UNKNOWN", command=self.next_unknown)
+        self.highlight_indexes = []
+        self.previous_highlight = None
+        self.btn_next_unknown = tk.Button(self.frm, text="NEXT", command=self.next_unknown)
+        self.btn_next_unknown.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SE)
+        self.btn_prev_unknown = tk.Button(self.frm, text="PREVIOUS", command=self.previous_unknown)
+        self.btn_prev_unknown.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_next_unknown.pack()
         self.spellchecker = spellchecker
         self.text.tag_config("highlight", background="yellow")
@@ -119,9 +124,55 @@ class SpellcheckerApp:
         self.text.bind("<ButtonRelease-3>", self.show_menu)
         self.text.tag_bind("highlight", "<Button-3>", self.show_menu)
         self.text.tag_bind("selected", "<ButtonRelease-3>", self.show_menu)
+        self.text.bind("<KeyPress>", self.keypress_action)
+        self.text.bind("<KeyRelease>", self.keyrelease_action)
+        self.arrow_key_mode = False
+        self.arrow_last_time = time.time()
+        self.arrow_time_reset = 5
+        self.arrow_key_count = 0
+        self.arrow_key_req = 3
+        self.text.bind("<Left>", self.arrow_key_move)
+        self.text.bind("<Right>", self.arrow_key_move)
+        self.text.bind("<Up>", self.on_arrow_mode)
+        self.text.bind("<Down>", self.off_arrow_mode)
         spellchecker.spell_check()
         self.highlight_unknown()
 
+    def on_arrow_mode(self, event):
+        if not self.arrow_key_mode:
+            self.arrow_key_count += 1
+            if self.arrow_key_count >= self.arrow_key_req:
+                self.arrow_key_mode = True
+                self.arrow_key_count = 0
+    
+    def off_arrow_mode(self, event):
+        if self.arrow_key_mode:
+            self.arrow_key_count += 1
+            if self.arrow_key_count >= self.arrow_key_req:
+                self.arrow_key_mode=False
+                self.arrow_key_count = 0
+
+
+    def arrow_key_move(self, event):
+        if self.arrow_key_mode:
+            if event.keysym == "Left":
+                self.previous_unknown()
+            elif event.keysym == "Right":
+                self.next_unknown()
+            else:
+                pass
+
+    def keypress_action(self, event):
+        self.text.edit_separator()
+    
+    def keyrelease_action(self, event):
+        self.text.edit_separator()
+        self.text.after(1, self.processing_event)
+    
+    def processing_event(self):
+        if self.text.edit_modified():
+            self.text.edit_modified(0)
+            self.highlight_unknown()
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
         word = self.text.get(curr_index+" wordstart", curr_index+" wordend")
@@ -130,7 +181,6 @@ class SpellcheckerApp:
             self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
             self.text.tag_config("selected", background="blue")
             if word in self.unknown_words:
-                self.text.tag_remove("highlight", curr_index+" wordstart", curr_index+" wordend")
                 if self.text.tag_ranges("highlight") and (curr_index in self.text.tag_ranges("highlight")):
                     self.text.tag_configure("selected", background="blue")
                     self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
@@ -141,35 +191,57 @@ class SpellcheckerApp:
                     menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
-        if self.unknown_words:
-            if self.current_unknown_index < (len(self.unknown_words)-1):
-                self.current_unknown_index += 1
-            else:
-                self.current_unknown_index = 0
+        if self.initial and self.highlight_indexes:
+            self.text.tag_config("highlight", background="yellow")
+            self.initial = False
+        else:
+            self.text.tag_config("selected", background="blue")
+        if self.highlight_indexes:
+            self.text.tag_remove("selected", "1.0", tk.END)
+            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
+            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            self.text.mark_set(tk.INSERT, start_index)
             self.highlight_unknown()
+            self.text.tag_add("selected", start_index, end_index)
+            self.text.tag_config("selected", background="blue")
+            
+    def previous_unknown(self):
+        if self.highlight_indexes:
+            self.text.tag_remove("selected", "1.0", tk.END)
+            self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
+            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            self.text.mark_set(tk.INSERT, start_index)
+            self.text.tag_remove("highlight", "1.0", tk.END)
+            for index, (start, end) in enumerate(self.highlight_indexes):
+                if index != self.current_unknown_index:
+                    self.text.tag_add("highlight", start, end)
+            self.text.tag_add("selected", start_index, end_index)
+            self.text.tag_config("selected", background="blue")
+            self.text.tag_config("highlight", background="yellow")
+
 
     def highlight_unknown(self):
         def remove_punct(word):
             return word.rstrip('.?!:\n ') in self.spellchecker.known_words and word.lstrip('.?!:\n ') in self.spellchecker.known_words
-        start_text = "1.0"
-        end_text = tk.END
-        self.text.tag_remove("highlight", start_text, end_text)
+        self.text.tag_remove("highlight", "1.0", tk.END)
+        self.highlight_indexes = []
         for line_num in range(1, int(self.text.index(tk.END).split('.')[0])+1):
             line_start= "{}.0".format(line_num)
             line_end= "{}.end".format(line_num)
             line_text = self.text.get(line_start, line_end)
-            for word in re.findall(r'\b\w+[.?!:]?\b', line_text):
+            for match in re.finditer(r'\b\w+[.?!:]?\b', line_text):
+                word=match.group()
                 if not remove_punct(word):
-                    start_pos = self.text.search(r'\y{}\y'.format(word), line_start, line_end, regexp=True)
-                    while start_pos:
-                        end_pos = self.text.index('{}+{}c'.format(start_pos, len(word)))
-                        self.text.tag_add("highlight", start_pos, end_pos)
-                        start_pos=self.text.search('r\y{}\y'.format(word), end_pos, line_end, regexp=True)
-        self.text.tag_config("highlight", background="yellow")
+                    start_pos = "{}+{}c".format(line_start, match.start())
+                    end_pos = "{}+{}c".format(line_start, match.end())
+                    self.highlight_indexes.append((start_pos, end_pos))
+        for index, (start_index, end_index) in enumerate(self.highlight_indexes):
+            if index != self.current_unknown_index:
+                self.text.tag_add("highlight", start_index, end_index)
+                self.text.tag_config("highlight", background="yellow")
     def ignore_unknown(self):
         unknown_word = self.unknown_words[self.current_unknown_index]
         self.unknown_words.remove(unknown_word)
-        self.unknown_word_count -= 1
         self.next_unknown()
     
     def accept_suggestion(self):
