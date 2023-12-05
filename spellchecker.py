@@ -154,6 +154,9 @@ class SpellcheckerApp:
             if self.arrow_key_count >= self.arrow_key_req:
                 self.arrow_key_mode = True
                 self.arrow_key_count = 0
+                self.btn_next_anchor = tk.SE
+                self.btn_prev_anchor = tk.SW
+                self.hide_btns()
     
     def off_arrow_mode(self, event):
         if self.arrow_key_mode and (event.state & 0x1):
@@ -161,6 +164,17 @@ class SpellcheckerApp:
             if self.arrow_key_count >= self.arrow_key_req:
                 self.arrow_key_mode=False
                 self.arrow_key_count = 0
+                self.btn_next_anchor = tk.RIGHT
+                self.btn_prev_anchor = tk.RIGHT
+                self.show_btns()
+    
+    def hide_btns(self):
+        self.btn_next_unknown.pack_forget()
+        self.btn_prev_unknown.pack_forget()
+    
+    def show_btns(self):
+        self.btn_next_unknown.pack(side=self.btn_next_anchor, padx=3, pady=3, anchor=tk.SE)
+        self.btn_prev_unknown.pack(side=self.btn_prev_anchor, padx=3, pady=3, anchor=tk.SW)
 
     def arrow_key_move(self, event):
         if self.arrow_key_mode:
