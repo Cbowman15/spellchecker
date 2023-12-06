@@ -12,7 +12,9 @@ class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
         self.reference_file = reference_file
         self.known_words = self.get_known_words(known_words_file)
+        self.ignored_words = set()
         self.unknown_word_count = 0 #remember to print at the end
+        self.unknown_words = []
         self.sim_score = self.get_sim_score(sim_score_file)
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
@@ -20,6 +22,7 @@ class Spellchecker():
             if word not in self.known_words:
                 suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
                 self.unknown_word_count += 1
+                self.unknown_words.append(word)
     def get_known_words(self, known_words_file):
         with open(known_words_file, "rt") as known_file:
             return set(known_file.read().split())
@@ -74,7 +77,7 @@ class TextFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
-        return self.text.split()
+        return re.split(r'\s', self.text.strip())
 
 class HTMLFile(ReferenceFile): #depending on how I want command line, may
     def __init__(self, text):  #have to use a 'with open'
@@ -110,7 +113,6 @@ class SpellcheckerApp:
         text_content = ' ' + text_content
         self.text.insert(tk.END, text_content)
         self.initial = True
-        self.unknown_words = []
         self.current_unknown_index = 0
         self.highlight_indexes = []
         self.previous_highlight = None
@@ -120,6 +122,7 @@ class SpellcheckerApp:
         self.btn_prev_unknown.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_next_unknown.pack()
         self.spellchecker = spellchecker
+        self.unknown_words = spellchecker.unknown_words
         self.text.tag_config("highlight", background="yellow")
         self.text.tag_config("selected", background="blue")
         self.text.tag_bind("highlight", "<Button-3>", self.show_menu)
@@ -214,21 +217,18 @@ class SpellcheckerApp:
             self.timer_delay = None
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
-        word = self.text.get(curr_index+" wordstart", curr_index+" wordend")
-        self.text.tag_remove("selected", "1.0", tk.END)
-        if "highlight" in self.text.tag_names(curr_index):
-            self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
+        word = self.text.get(curr_index + " wordstart", curr_index + " wordend")
+        r_move_insert = self.text.index("@%d, %d"%(event.x, event.y))
+        self.text.mark_set(tk.INSERT, r_move_insert)
+        if "highlight" in self.text.tag_names(curr_index) and word and word in self.unknown_words:
+            self.text.tag_remove("selected", "1.0", tk.END)
+            self.text.tag_add("selected", curr_index + " wordstart", curr_index + " wordend")
             self.text.tag_config("selected", background="blue")
-            if word in self.unknown_words:
-                if self.text.tag_ranges("highlight") and (curr_index in self.text.tag_ranges("highlight")):
-                    self.text.tag_configure("selected", background="blue")
-                    self.text.tag_add("selected", curr_index+" wordstart", curr_index+" wordend")
-            if "selected" in self.text.tag_names(curr_index):
-                menu = tk.Menu(self.text, tearoff=1)
-                menu.add_command(label="Ignore", command=self.ignore_unknown)
-                menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
-                menu.add_command(label="Delete", command=self.delete_unknown)
-                menu.post(event.x_root, event.y_root)
+            menu = tk.Menu(self.text, tearoff=1)
+            menu.add_command(label="Ignore", command=self.ignore_unknown)
+            menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
+            menu.add_command(label="Delete", command=self.delete_unknown)
+            menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
         if self.highlight_indexes:
@@ -247,7 +247,6 @@ class SpellcheckerApp:
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
-        
             
     def previous_unknown(self):
         if self.highlight_indexes:
@@ -274,7 +273,6 @@ class SpellcheckerApp:
         else:
             self.text.mark_set(tk.INSERT, pos)
 
-
     def highlight_unknown(self):
         curr_time = time.time()
         if self.arrow_key_mode and (curr_time-self.arrow_last_time>self.arrow_time_reset):
@@ -290,11 +288,13 @@ class SpellcheckerApp:
                 line_text = self.text.get(line_start, line_end)
                 for match in re.finditer(r'\b[^\W\n]+[.?!:]?\b', line_text):
                     word=match.group()
-                    if word not in self.spellchecker.known_words:
+                    if word not in self.spellchecker.known_words and word not in self.spellchecker.ignored_words:
                         start_pos = "{}+{}c".format(line_start, match.start())
                         end_pos = "{}+{}c".format(line_start, match.end())
                         self.text.tag_add("highlight", start_pos, end_pos)
                         now_known_indexes.append((start_pos, end_pos))
+                        if word not in self.unknown_words:
+                            self.unknown_words.append(word)
             self.highlight_indexes = now_known_indexes
             self.current_unknown_index = (len(self.highlight_indexes)-1)
             for index, (start_index, end_index) in enumerate(self.highlight_indexes):
@@ -307,19 +307,29 @@ class SpellcheckerApp:
             self.set_insertion(curr_index)
             
     def ignore_unknown(self):
-        if self.unknown_words:
-            unknown_word = self.unknown_words[self.current_unknown_index]
-            self.unknown_words.remove(unknown_word)
-            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            self.text.tag_remove("highlight", "1.0", tk.END)
-            self.text.tag_remove("selected", "1.0", tk.END)
-            self.next_unknown()
-            print("Ignoring unknown word:", unknown_word)
-
-            ignored_file_path = r"C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\ign_words.txt"
-            with open(ignored_file_path, 'a') as ignored_file:
-                ignored_file.write(unknown_word + '\n')
-                print("Appended to ignored file:", unknown_word)
+        if not self.highlight_indexes:
+            return
+        curr_index = self.text.index(tk.INSERT)
+        curr_word_start = curr_index + " wordstart"
+        curr_word_end = curr_index + " wordend"
+        word = self.text.get(curr_word_start, curr_word_end)
+        if word in self.unknown_words:
+            self.unknown_words.remove(word)
+            self.spellchecker.ignored_words.add(word)
+            self.text.tag_remove("highlight", curr_word_start, curr_word_end)
+            self.text.tag_remove("selected", curr_word_start, curr_word_end)
+            self.highlight_unknown()
+            with open("ign_words.txt", 'at') as ignored_file:
+                ignored_file.write(word + '\n')
+            self.highlight_unknown()
+    def get_next_unknown_start(self, from_index):
+        next_index = self.text.search(r'\b[^\W\d_]+\b', from_index, tk.END, regexp=True)
+        while next_index:
+            if self.text.get(next_index + " wordstart", next_index + " wordend") in self.unknown_words:
+                return next_index
+            next_index = self.text.index(next_index + " wordend")
+            next_index = self.text.search(r'\b[^\W\d_]+\b', next_index + " +1c", tk.END, regexp=True)
+        return None
     
     def accept_suggestion(self):
         if self.unknown_words:
@@ -362,6 +372,7 @@ if __name__ == "__main__":
     reference_file = TextFile(text_content)
     known_words_file = "words.txt"
     sim_scores_file = "similarity_scores.py"
+    ign_words_file = "ign_words.txt"
     window = tk.Tk()
     spellchecker = Spellchecker(reference_file,known_words_file,sim_scores_file)
     app = SpellcheckerApp(window, spellchecker)
