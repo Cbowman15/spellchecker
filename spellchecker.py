@@ -286,7 +286,7 @@ class SpellcheckerApp:
                 line_start= "{}.0".format(line_num)
                 line_end= "{}.end".format(line_num)
                 line_text = self.text.get(line_start, line_end)
-                for match in re.finditer(r'\b[^\W\n]+[.?!:]?\b', line_text):
+                for match in re.finditer(r'\b[a-zA-Z]+\b', line_text):
                     word=match.group()
                     if word not in self.spellchecker.known_words and word not in self.spellchecker.ignored_words:
                         start_pos = "{}+{}c".format(line_start, match.start())
@@ -323,7 +323,7 @@ class SpellcheckerApp:
                 ignored_file.write(word + '\n')
             self.highlight_unknown()
     def get_next_unknown_start(self, from_index):
-        next_index = self.text.search(r'\b[^\W\d_]+\b', from_index, tk.END, regexp=True)
+        next_index = self.text.search(r'\b[a-zA-Z]+\b', from_index, tk.END, regexp=True)
         while next_index:
             if self.text.get(next_index + " wordstart", next_index + " wordend") in self.unknown_words:
                 return next_index
