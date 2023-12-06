@@ -43,7 +43,7 @@ class ReferenceFile():
 class Suggester():
     @staticmethod
     def get_suggestions(word, known_words, sim_score): #work on this NEXT!
-        suggestions = sorted(known_words, key=lambda known_word:Levenshtein.distance(word, known_word))
+        suggestions = sorted(known_words, key=lambda known_word:Suggester.levenshtein_distance(word, known_word, sim_score))
         return suggestions[:3]
     
     def __init__(self, known_words=None):
@@ -55,20 +55,20 @@ class Suggester():
             return False
     @staticmethod
     def levenshtein_distance(word1, word2, sim_score):
-        min_edit_dist = list(range(len(word1)+1))
-        for index1, letters1 in enumerate(word1,1):
-            calc_dist = [index1]
-            for index2, letters2 in enumerate(word2, 1):
-                print("letters1: {}, letters2: {}".format(letters1, letters2))
-                cost = sim_score.get((letters1, letters2), 0)
-                print("Cost: {}".format(cost))
-                if letters2 == letters1:
-                    calc_dist.append(min_edit_dist[index2-1])
+        min_edit_dist = list(range(len(word2)+1))
+        for index1, letters1 in enumerate(word1):
+            calc_dist = [index1+1]
+            for index2, letters2 in enumerate(word2):
+                if letters1 == letters2:
+                    cost = 0
                 else:
-                    calc_dist.append(cost+min(min_edit_dist[index2], min_edit_dist[index2-1], calc_dist[-1]))
-                    if (index1>0) and (index2>0) and (word2[index2-1]==letters1) and (word2[index2]==letters2):
-                        calc_dist[-1]=min(calc_dist[-1], min_edit_dist[index2-1]+cost)
-            min_edit_dist = calc_dist
+                    sim_score_ref = tuple(sorted((letters1, letters2)))
+                    cost = sim_score.get(sim_score_ref, 1)
+                insert = calc_dist[index2]+1
+                sub = min_edit_dist[index2]+cost
+                delete = min_edit_dist[index2+1]+1
+                calc_dist.append(min(insert, delete, sub))
+            min_edit_dist=calc_dist
         return min_edit_dist[-1]
         
 
@@ -341,22 +341,22 @@ class SpellcheckerApp:
     
     def suggestion_menu(self, unknown_word, suggestions):
         menu = tk.Menu(self.text, tearoff=0)
-        for suggestion in suggestions[:3]:
-            menu.add_command(label=suggestion, command=self.get_a_suggestion(unknown_word, suggestion))
+        for suggestion in suggestions:
+            menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
         menu.post(self.text.winfo_pointerx(), self.text.winfo_pointery()) #will need to check on this--not sure about it
-    
+        
+
     def get_a_suggestion(self, unknown_word, suggestion):
         return lambda: self.replace_unknown(unknown_word, suggestion)
+
     def replace_unknown(self, unknown_word, suggestion):
-        start_text = "1.0"
-        end_text = tk.END
-        start_text = self.text.search(r'\y{}\y'.format(unknown_word), start_text, end_text, regexp=True)
-        while start_text:
-            end_text = self.text.index('{}+{}c'.format(start_text, len(unknown_word))) #have REALLY got to check on this (come back when debugging)
-            self.text.delete(start_text, end_text)
-            self.text.insert(start_text, suggestion)
-            start_text = self.text.search(r'\y{}\y'.format(unknown_word), end_text, end_text, regexp=True)
-        self.unknown_words[self.current_unknown_index] = suggestion
+        text = self.text.get("1.0", tk.END)
+        replaced_text = text.replace(unknown_word, suggestion)
+        self.text.delete("1.0", tk.END)
+        self.text.insert("1.0", replaced_text)
+        self.unknown_word_count -= 1
+        if unknown_word in self.unknown_words:
+            self.unknown_words.remove(unknown_word)
         
     def delete_unknown(self):
         unknown_word = self.unknown_words[self.current_unknown_index]
