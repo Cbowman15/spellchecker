@@ -328,7 +328,7 @@ class SpellcheckerApp:
             if self.text.get(next_index + " wordstart", next_index + " wordend") in self.unknown_words:
                 return next_index
             next_index = self.text.index(next_index + " wordend")
-            next_index = self.text.search(r'\b[^\W\d_]+\b', next_index + " +1c", tk.END, regexp=True)
+            next_index = self.text.search(r'\b[a-zA-Z]+\b', next_index + " +1c", tk.END, regexp=True)
         return None
     
     def accept_suggestion(self):
