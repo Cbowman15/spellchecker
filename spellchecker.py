@@ -7,6 +7,7 @@ import tkinter as tk
 import Levenshtein
 import re
 import time
+import os
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, sim_score_file):
         self.reference_file = reference_file
@@ -121,10 +122,7 @@ class SpellcheckerApp:
         self.spellchecker = spellchecker
         self.text.tag_config("highlight", background="yellow")
         self.text.tag_config("selected", background="blue")
-        self.text.bind("<Button-3>", self.show_menu)
-        self.text.bind("<ButtonRelease-3>", self.show_menu)
         self.text.tag_bind("highlight", "<Button-3>", self.show_menu)
-        self.text.tag_bind("selected", "<ButtonRelease-3>", self.show_menu)
         self.text.bind("<KeyPress>", self.keypress_action)
         self.text.bind("<KeyRelease>", self.keyrelease_action)
         self.arrow_key_mode = False
@@ -142,6 +140,9 @@ class SpellcheckerApp:
         self.text.bind("<Shift-Down>", self.overload_shift)
         self.text.bind("<KeyPress>", self.keypress_action)
         self.text.bind("<KeyRelease>", self.keyrelease_action)
+        self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
+        self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
+        self.btn_ignore.pack()
         self.curr_word_pos = None
         self.timer_delay = None
         self.time_delay = 5000
@@ -306,9 +307,19 @@ class SpellcheckerApp:
             self.set_insertion(curr_index)
             
     def ignore_unknown(self):
-        unknown_word = self.unknown_words[self.current_unknown_index]
-        self.unknown_words.remove(unknown_word)
-        self.next_unknown()
+        if self.unknown_words:
+            unknown_word = self.unknown_words[self.current_unknown_index]
+            self.unknown_words.remove(unknown_word)
+            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            self.text.tag_remove("highlight", "1.0", tk.END)
+            self.text.tag_remove("selected", "1.0", tk.END)
+            self.next_unknown()
+            print("Ignoring unknown word:", unknown_word)
+
+            ignored_file_path = r"C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\ign_words.txt"
+            with open(ignored_file_path, 'a') as ignored_file:
+                ignored_file.write(unknown_word + '\n')
+                print("Appended to ignored file:", unknown_word)
     
     def accept_suggestion(self):
         if self.unknown_words:
