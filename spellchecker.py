@@ -22,13 +22,11 @@ class Spellchecker():
 
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
-        self.unknown_words = []
-        self.unknown_word_count = 0 #remember to print!
         for word in words_to_check:
             if word not in self.known_words and word not in self.ignored_words:
                 suggestions = Suggester.get_suggestions(word, self.known_words)
                 self.unknown_word_count += 1
-                self.unknown_words.append(word)
+                self.unknown_words.append((word, suggestions))
     def get_known_words(self, known_words_file, personal_dict):
         known_words = set()
         with open(known_words_file, "rt") as known_file:
@@ -453,16 +451,18 @@ class SpellcheckerApp:
     def accept_suggestion(self):
         if self.curr_word_pos:
             word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
-            if word in [unknown_word[0] for unknown_word in self.spellchecker.unknown_words]:
+            if word:
                 suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words)
-                if suggestions:
-                    self.suggestion_menu(word, suggestions)
+                self.suggestion_menu(word, suggestions)
     
     def suggestion_menu(self, unknown_word, suggestions):
-        menu = tk.Menu(self.text, tearoff=0)
-        for suggestion in suggestions:
-            menu.add_command(label=suggestion, command=lambda s=suggestion, uw=unknown_word: self.replace_unknown(uw, s))
-        menu.post(self.text.winfo_pointerx(), self.text.winfo_pointery()) #will need to check on this--not sure about it
+        self.menu.delete(0, tk.END)
+        if suggestions:
+            for suggestion in suggestions:
+                self.menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
+            x = self.text.winfo_pointerx()
+            y = self.text.winfo_pointery()
+            self.menu.tk_popup(x,y) #will need to check on this--not sure about it
         
 
     def get_a_suggestion(self, unknown_word, suggestion):
@@ -470,15 +470,26 @@ class SpellcheckerApp:
 
     def replace_unknown(self, unknown_word, suggestion):
         start_index = self.text.search(unknown_word, "1.0", tk.END)
-        if start_index:
+        while start_index:
             end_index = self.text.index("{}+{}c".format(start_index, len(unknown_word)))
-            self.text.delete(start_index, end_index)
-            self.text.insert(start_index, suggestion)
-            self.spellchecker.known_words.add(suggestion)
-            if unknown_word in self.spellchecker.unknown_words:
-                self.spellchecker.unknown_words.remove(unknown_word)
-            self.text.tag_remove("highlight", start_index, "{}+{}c".format(start_index, len(suggestion)))
-            self.highlight_unknown()
+            curr_word = self.text.get(start_index, end_index)
+            if curr_word == unknown_word and self.text.tag_ranges("selected"):
+                start_word = self.text.index("selected.first")
+                end_word = self.text.index("selected.last")
+                if start_index == start_word and end_index == end_word:
+                    self.text.delete(start_index, end_index)
+                    self.text.insert(start_index, suggestion)
+                    self.update_known(unknown_word, suggestion)
+                    self.curr_word_pos = None
+                    break
+            start_index = self.text.search(unknown_word, end_index, tk.END)
+    
+    def update_known(self, prev, new):
+        if prev in self.unknown_words:
+            self.unknown_words.remove(prev)
+        self.spellchecker.ignored_words.discard(prev)
+        self.spellchecker.known_words.add(new)
+        self.highlight_unknown()
 
     def personal_dict(self):
         if self.curr_word_pos:
