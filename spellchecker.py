@@ -334,36 +334,32 @@ class SpellcheckerApp:
             menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
+        self.text.tag_remove("selected", "1.0", tk.END)
         if self.highlight_indexes:
+            self.current_unknown_index = (self.current_unknown_index+1)%(len(self.highlight_indexes))
+            for index, (start_index, end_index) in enumerate(self.highlight_indexes):
+                self.text.tag_remove("highlight", start_index, end_index)
+                if index == self.current_unknown_index:
+                    self.text.tag_add("selected", start_index, end_index)
+                    self.set_insertion(start_index)
+                else:
+                    self.text.tag_add("highlight", start_index, end_index)
             self.text.tag_config("highlight", background="yellow")
-            self.initial = False
-        else:
             self.text.tag_config("selected", background="blue")
-        if self.highlight_indexes:
-            self.text.tag_remove("selected", "1.0", tk.END)
-            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
-            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            self.set_insertion(start_index)
-            for index, (start, end) in enumerate(self.highlight_indexes):
-                if index != self.current_unknown_index:
-                    self.text.tag_add("highlight", start, end)
-            self.text.tag_add("selected", start_index, end_index)
-            self.text.tag_config("selected", background="blue")
-            self.text.tag_config("highlight", background="yellow")
             
     def previous_unknown(self):
+        self.text.tag_remove("selected", "1.0", tk.END)
         if self.highlight_indexes:
-            self.text.tag_remove("selected", "1.0", tk.END)
-            self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
-            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            self.set_insertion(start_index)
-            self.text.tag_remove("highlight", "1.0", tk.END)
+            self.current_unknown_index = (self.current_unknown_index-1+len(self.highlight_indexes))%(len(self.highlight_indexes))
             for index, (start, end) in enumerate(self.highlight_indexes):
-                if index != self.current_unknown_index:
+                self.text.tag_remove("highlight", start, end)
+                if index == self.current_unknown_index:
+                    self.text.tag_add("selected", start, end)
+                    self.set_insertion(start)
+                else:
                     self.text.tag_add("highlight", start, end)
-            self.text.tag_add("selected", start_index, end_index)
-            self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
+            self.text.tag_config("selected", background="blue")
         
     
     def set_insertion(self, pos):
