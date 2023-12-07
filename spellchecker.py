@@ -10,12 +10,14 @@ import time
 import Levenshtein
 import os
 class Spellchecker():
-    def __init__(self, reference_file, known_words_file):
+    def __init__(self, reference_file, known_words_file, personal_dict):
         self.reference_file = reference_file
-        self.known_words = self.get_known_words(known_words_file)
+        self.known_words = self.get_known_words(known_words_file, personal_dict)
         self.ignored_words = set()
         self.unknown_word_count = 0 #remember to print at the end
         self.unknown_words = []
+        
+
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
         for word in words_to_check:
@@ -23,9 +25,13 @@ class Spellchecker():
                 suggestions = Suggester.get_suggestions(word, self.known_words)
                 self.unknown_word_count += 1
                 self.unknown_words.append((word, suggestions))
-    def get_known_words(self, known_words_file):
+    def get_known_words(self, known_words_file, personal_dict):
+        known_words = set()
         with open(known_words_file, "rt") as known_file:
-            return set(known_file.read().split())
+            known_words.update(known_file.read().split())
+        with open(personal_dict, "rt") as personal_dict_file:
+            known_words.update(personal_dict_file.read().split())
+        return known_words
 
 class ReferenceFile():
     def __init__(self, text):
@@ -359,13 +365,18 @@ class SpellcheckerApp:
         self.next_unknown()
 
     def personal_dict(self):
-        new_word = self.text.get("current wordstart", "current wordend")
-        if new_word:
-            self.spellchecker.known_words.add(new_word)
-            self.text.tag_remove("highlight", "current wordstart","current wordend")
-            with open("pers_dict.txt", 'at') as personal_dict_file:
-                personal_dict_file.write(new_word+'\n')
-            self.highlight_unknown()
+        if self.curr_word_pos:
+            new_word = self.text.get(self.curr_word_pos+" wordstart",self.curr_word_pos+" wordend")
+            if new_word:
+                new_word = new_word.strip()
+                if new_word and (new_word not in self.spellchecker.known_words):
+                    self.spellchecker.known_words.add(new_word)
+                    self.text.tag_remove("highlight", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
+                    with open(personal_dict, 'rt') as personal_dict_file:
+                        if new_word not in personal_dict:
+                            with open(personal_dict, 'at') as personal_dict_file:
+                                personal_dict_file.write(new_word+'\n')
+                    self.highlight_unknown()
 
 if __name__ == "__main__":
     with open("example.txt", 'rt') as example_text_file:
@@ -374,8 +385,9 @@ if __name__ == "__main__":
     reference_file = TextFile(text_content)
     known_words_file = "words.txt"
     ign_words_file = "ign_words.txt"
+    personal_dict = "pers_dict.txt"
     window = tk.Tk()
-    spellchecker = Spellchecker(reference_file,known_words_file)
+    spellchecker = Spellchecker(reference_file,known_words_file, personal_dict)
     app = SpellcheckerApp(window, spellchecker)
     window.mainloop()
 #rest of globals
