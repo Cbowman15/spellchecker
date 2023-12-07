@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
 import tkinter as tk
-from tkinter import simpledialog
+from tkinter import filedialog
 import re
 import time
 import Levenshtein
@@ -135,7 +135,12 @@ class SpellcheckerApp:
         self.text.bind("<KeyRelease>", self.keyrelease_action)
         self.text.bind("<Control-z>", self.new_undo)
         self.text.bind("<Control-y>", self.new_redo)
-        
+        self.window.bind("<Control-o>", self.open_file)
+        self.top_menu = tk.Menu(window)
+        self.file_menu = tk.Menu(self.top_menu, tearoff=0)
+        self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file)
+        window.config(menu=self.top_menu)
+        self.top_menu.add_cascade(label = "File", menu= self.file_menu)
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
         self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_ignore.pack()
@@ -145,6 +150,27 @@ class SpellcheckerApp:
         self.menu=tk.Menu(self.text, tearoff=0)
         spellchecker.spell_check()
         self.highlight_unknown()
+
+    def open_file(self, event=None):
+        file_to_open = filedialog.askopenfilename()
+        if file_to_open:
+            if file_to_open.lower().endswith('.txt'):
+                with open(file_to_open, 'rt') as file:
+                    text_content = file.read()
+                self.spellchecker.reference_file = TextFile(text_content)
+            elif file_to_open.lower().endswith('.html') or file_to_open.lower().endswith('.htm'):
+                with open(file_to_open, 'rt') as file:
+                    text_content = file.read()
+                self.spellchecker.reference_file= HTMLFile(text_content)
+            elif file_to_open.lower().endswith('pdf'):
+                with open(file_to_open, 'rt') as file:
+                    text_content = file.read()
+                self.spellchecker.reference_file = PDFFile(text_content)
+            self.spellchecker.spell_check()
+            self.text.delete("1.0", tk.END)
+            self.text.insert(tk.END, self.spellchecker.reference_file.text)
+            self.highlight_unknown()
+        return "break"
 
     def on_arrow_mode(self, event):
         if not self.arrow_key_mode and (event.state & 0x1):
@@ -166,7 +192,6 @@ class SpellcheckerApp:
                 self.btn_prev_anchor = tk.RIGHT
                 self.btn_undo_anchor = tk.LEFT
                 self.btn_redo_anchor = tk.LEFT
-
                 self.show_btns()
     
     def hide_btns(self):
@@ -370,6 +395,28 @@ class SpellcheckerApp:
             with open("ign_words.txt", 'at') as ignored_file:
                 ignored_file.write(word + '\n')
             self.highlight_unknown()
+    
+    def ignore_all(self, event=None):
+        curr_word = self.get_curr_word(self.text.index(tk.INSERT))
+        if not curr_word:
+            return
+        self.spellchecker.ignored_words.add(curr_word)
+        updated_words = []
+        for word in self.unknown_words:
+            if word[0] != curr_word:
+                updated_words.append(word)
+        self.unknown_words = updated_words
+        self.text.tag_remove("highlight", "1.0", tk.END)
+        self.text.tag_remove("selected", "1.0", tk.END)
+        updated_hlight = []
+        for (start_index, end_index) in self.highlight_indexes:
+            if self.text.get(start_index, end_index) != curr_word:
+                updated_hlight.append((start_index, end_index))
+        self.highlight_indexes = updated_hlight
+        self.highlight_unknown()
+        with open("ign_words.txt", 'at') as ignored_file:
+            ignored_file.write(curr_word+'\n')
+
     def get_next_unknown_start(self, from_index):
         next_index = self.text.search(r'\b[a-zA-Z]+\b', from_index, tk.END, regexp=True)
         while next_index:
