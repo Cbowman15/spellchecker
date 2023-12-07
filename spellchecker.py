@@ -101,6 +101,14 @@ class SpellcheckerApp:
         self.btn_prev_unknown = tk.Button(self.frm, text="PREVIOUS", command=self.previous_unknown)
         self.btn_prev_unknown.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_next_unknown.pack()
+        self.btn_prev_unknown.pack()
+        self.btn_undo = tk.Button(self.frm, text="UNDO", command=self.undo)
+        self.btn_undo.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
+        self.btn_redo = tk.Button(self.frm, text="REDO", command=self.redo)
+        self.btn_redo.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SE)
+        self.btn_undo.pack()
+        self.btn_redo.pack()
+        self.text.config(undo=True)
         self.spellchecker = spellchecker
         self.unknown_words = spellchecker.unknown_words
         self.text.tag_config("highlight", background="yellow")
@@ -152,15 +160,23 @@ class SpellcheckerApp:
                 self.arrow_key_count = 0
                 self.btn_next_anchor = tk.RIGHT
                 self.btn_prev_anchor = tk.RIGHT
+                self.btn_undo_anchor = tk.LEFT
+                self.btn_redo_anchor = tk.LEFT
+
                 self.show_btns()
     
     def hide_btns(self):
         self.btn_next_unknown.pack_forget()
         self.btn_prev_unknown.pack_forget()
+        self.btn_undo.pack_forget()
+        self.btn_redo.pack_forget()
     
     def show_btns(self):
         self.btn_next_unknown.pack(side=self.btn_next_anchor, padx=3, pady=3, anchor=tk.SE)
         self.btn_prev_unknown.pack(side=self.btn_prev_anchor, padx=3, pady=3, anchor=tk.SW)
+        self.btn_undo.pack(side=self.btn_undo_anchor, padx=3, pady=3, anchor=tk.SW)
+        self.btn_redo.pack(side=self.btn_redo_anchor, padx=3, pady=3, anchor=tk.SE)
+
 
     def arrow_key_move(self, event):
         if self.arrow_key_mode:
@@ -180,6 +196,12 @@ class SpellcheckerApp:
             return "break"
         else:
             return "break"
+        
+    def undo(self):
+        self.text.edit_undo()
+    
+    def redo(self):
+        self.text.edit_redo()
         
 
     def keypress_action(self, event):
