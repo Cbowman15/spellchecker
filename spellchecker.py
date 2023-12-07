@@ -19,14 +19,22 @@ class Spellchecker():
         self.unknown_word_count = 0 #remember to print at the end
         self.unknown_words = []
         
-
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
-        for word in words_to_check:
-            if word not in self.known_words and word not in self.ignored_words:
-                suggestions = Suggester.get_suggestions(word, self.known_words)
+        for index, word in enumerate(words_to_check):
+            known = (word.lower() in self.known_words) or (word in self.known_words)
+            if_start_sent = self.start_sentence(index, words_to_check)
+            if not known and not (if_start_sent and word.istitle()):
+                suggestions = Suggester.get_suggestions(word.lower(), self.known_words)
                 self.unknown_word_count += 1
                 self.unknown_words.append((word, suggestions))
+
+    def start_sentence(self, word_index, words_to_check):
+        if word_index == 0:
+            return True
+        prev_word = words_to_check[word_index-1]
+        return prev_word[-1] in ".!?;"
+
     def get_known_words(self, known_words_file, personal_dict):
         known_words = set()
         with open(known_words_file, "rt") as known_file:
@@ -359,14 +367,9 @@ class SpellcheckerApp:
         
     
     def set_insertion(self, pos):
-        prev_whitespace = self.text.search(r'\s', pos, backwards=True, regexp=True)
-        if self.arrow_key_mode:
-            if self.text.compare(tk.INSERT, '>', pos):
-                self.text.mark_set(tk.INSERT, "{}+1c".format(pos))
-            else:
-                self.text.mark_set(tk.INSERT, "{}-1c".format(pos))
-        else:
+        if not self.arrow_key_mode:
             self.text.mark_set(tk.INSERT, pos)
+            self.text.see(tk.INSERT)
 
     def highlight_unknown(self):
         curr_time = time.time()
@@ -377,29 +380,42 @@ class SpellcheckerApp:
             curr_line_num = int(curr_index.split('.')[0])
             self.text.tag_remove("highlight", "1.0", tk.END)
             now_known_indexes = []
+            punctuation_mark = True
             for line_num in range(1, int(self.text.index(tk.END).split('.')[0])+1):
                 line_start= "{}.0".format(line_num)
                 line_end= "{}.end".format(line_num)
                 line_text = self.text.get(line_start, line_end)
                 for match in re.finditer(r'\b[a-zA-Z]+\b', line_text):
                     word=match.group()
-                    if word not in self.spellchecker.known_words and word not in self.spellchecker.ignored_words:
-                        start_pos = "{}+{}c".format(line_start, match.start())
-                        end_pos = "{}+{}c".format(line_start, match.end())
-                        self.text.tag_add("highlight", start_pos, end_pos)
-                        now_known_indexes.append((start_pos, end_pos))
-                        if word not in self.unknown_words:
-                            self.unknown_words.append(word)
-            self.highlight_indexes = now_known_indexes
-            self.current_unknown_index = (len(self.highlight_indexes)-1)
-            for index, (start_index, end_index) in enumerate(self.highlight_indexes):
-                if index!=self.current_unknown_index:
-                    self.text.tag_add("highlight", start_index, end_index)
-                    self.text.tag_config("highlight", background="yellow")
-            curr_highlight_area  = len(self.text.get(curr_index+" wordstart", curr_index+" wordend"))
-            curr_index = "{}.{}".format(curr_line_num, curr_highlight_area)
-            self.text.tag_add("highlight", curr_index+" wordstart", curr_index+" wordend")
-            self.set_insertion(curr_index)
+                    lower_word = word.lower()
+                    exclusions = word.istitle() and lower_word in self.sepllchecker.known_words
+                    capital_known_word = (word.isupper() or (
+                        word.istitle() and not punctuation_mark)) and lower_word in self.spellchecker.known_words
+                    start_pos = "{}+{}c".format(line_start, match.start())
+                    end_pos = "{}+{}c".format(line_start, match.end())
+                    if not exclusions and not capital_known_word:
+                        if (lower_word not in self.spellchecker.known_words) and (
+                            lower_word not in self.spellchecker.ignored_words):
+                            self.text.tag_add("highlight", start_pos, end_pos)
+                            now_known_indexes.append((start_pos, end_pos))
+                            if lower_word not in self.unknown_words:
+                                self.unknown_words.append(lower_word)
+                    punctuation_mark = re.match(r".*[.!?;]$", line_text[:match.end()])
+                self.highlight_indexes = now_known_indexes
+                self.current_unknown_index = len(self.highlight_indexes)-1
+                self.text.tag_config("highlight", background="yellow")
+                self.set_insertion("1.0")
+                self.text.tag_bind("highlight", "<Button-1>", self.show_menu)
+
+    def hlight_word(self, word, line_start, now_known_indexes):
+        match = re.search(r'\b{}\b'.format(re.escape(word)), self.text.get(line_start, line_start+"lineend"))
+        if match:
+            start_pos = "{}+{}c".format(line_start, match.start())
+            end_pos = "{}+{}c".format(line_start, match.end())
+            self.text.tag_add("highlight", start_pos, end_pos)
+            now_known_indexes.append((start_pos, end_pos))
+            if (word.lower() not in self.unknown_words) and (word not in self.unknown_words):
+                self.unknown_words.append(word.lower())
             
     def ignore_unknown(self):
         if not self.highlight_indexes:
