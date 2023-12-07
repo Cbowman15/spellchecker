@@ -108,7 +108,9 @@ class SpellcheckerApp:
         self.btn_redo.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SE)
         self.btn_undo.pack()
         self.btn_redo.pack()
-        self.text.config(undo=True)
+        self.undo_hist = []
+        self.redo_hist = []
+        self.text.config(undo=False)
         self.spellchecker = spellchecker
         self.unknown_words = spellchecker.unknown_words
         self.text.tag_config("highlight", background="yellow")
@@ -131,6 +133,8 @@ class SpellcheckerApp:
         self.text.bind("<Shift-Down>", self.overload_shift)
         self.text.bind("<KeyPress>", self.keypress_action)
         self.text.bind("<KeyRelease>", self.keyrelease_action)
+        self.text.bind("<Control-z>", self.new_undo)
+        self.text.bind("<Control-y>", self.new_redo)
         
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
         self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
@@ -198,10 +202,10 @@ class SpellcheckerApp:
             return "break"
         
     def undo(self):
-        self.text.edit_undo()
+        self.new_undo()
     
     def redo(self):
-        self.text.edit_redo()
+        self.new_redo()
         
 
     def keypress_action(self, event):
@@ -209,6 +213,8 @@ class SpellcheckerApp:
             if self.timer_delay:
                 self.window.after_cancel(self.timer_delay)
             self.timer_delay = self.window.after(self.time_delay, self.processing_event)
+        if event.char in '.!?,;)("][':
+            self.save_undo()
         
     def keyrelease_action(self, event):
         if self.timer_delay:
@@ -223,6 +229,31 @@ class SpellcheckerApp:
         if self.timer_delay:
             self.window.after_cancel(self.timer_delay)
             self.timer_delay = None
+
+    def save_undo(self):
+        text = self.text.get("1.0", tk.END)
+        cursor_pos = self.text.index(tk.INSERT)
+        self.undo_hist.append((text, cursor_pos))
+    
+    def new_undo(self, event=None):
+        if self.undo_hist:
+            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
+            self.redo_hist.append(current)
+            prev = self.undo_hist.pop()
+            self.text.delete("1.0", tk.END)
+            self.text.insert("1.0", prev[0])
+            self.text.mark_set(tk.INSERT, prev[1])
+        return "break"
+    
+    def new_redo(self, event=None):
+        if self.redo_hist:
+            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
+            self.undo_hist.append(current)
+            new = self.redo_hist.pop()
+            self.text.delete("1.0", tk.END)
+            self.text.insert("1.0", new[0])
+            self.text.mark_set(tk.INSERT, new[1])
+        return "break"
     
     def get_curr_word(self, curr_index):
         start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
