@@ -202,6 +202,11 @@ class SpellcheckerApp:
             self.window.after_cancel(self.timer_delay)
             self.timer_delay = None
     
+    def update_hlight(self):
+        self.text.tag_remove("highlight", "1.0", tk.END)
+        for (start_word, end_word) in self.highlight_indexes:
+            self.text.tag_add("highlight", start_word, end_word)
+    
     def get_curr_word(self, curr_index):
         start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
         end_word = self.text.search(r'\M', curr_index, regexp=True)
@@ -358,11 +363,18 @@ class SpellcheckerApp:
             self.highlight_unknown()
         
     def delete_unknown(self):
-        unknown_word = self.unknown_words[self.current_unknown_index]
-        self.text.delete("insert-1c wordstart", "insert")
-        self.text.insert("insert", "<REPLACE>")
-        self.unknown_word_count -= 1
-        self.next_unknown()
+        if self.highlight_indexes and (self.current_unknown_index<len(self.highlight_indexes)):
+            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            del_word = self.text.get(start_index, end_index)
+            if del_word in self.unknown_words:
+                self.text.delete(start_index, end_index)
+                if del_word in self.spellchecker.ignored_words:
+                    self.unknown_words.remove(del_word)
+                self.text.insert(start_index, "<REPLACE>")
+                self.spellchecker.unknown_word_count -= 1
+                self.highlight_indexes.pop(self.current_unknown_index)
+                self.update_hlight()
+                self.next_unknown()
 
     def personal_dict(self):
         if self.curr_word_pos:
