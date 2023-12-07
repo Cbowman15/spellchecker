@@ -4,35 +4,27 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
 import tkinter as tk
-import Levenshtein
 import re
 import time
+import Levenshtein
 import os
 class Spellchecker():
-    def __init__(self, reference_file, known_words_file, sim_score_file):
+    def __init__(self, reference_file, known_words_file):
         self.reference_file = reference_file
         self.known_words = self.get_known_words(known_words_file)
         self.ignored_words = set()
         self.unknown_word_count = 0 #remember to print at the end
         self.unknown_words = []
-        self.sim_score = self.get_sim_score(sim_score_file)
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
         for word in words_to_check:
-            if word not in self.known_words:
-                suggestions = Suggester.get_suggestions(word, self.known_words, self.sim_score)
+            if word not in self.known_words and word not in self.ignored_words:
+                suggestions = Suggester.get_suggestions(word, self.known_words)
                 self.unknown_word_count += 1
-                self.unknown_words.append(word)
+                self.unknown_words.append((word, suggestions))
     def get_known_words(self, known_words_file):
         with open(known_words_file, "rt") as known_file:
             return set(known_file.read().split())
-    def get_sim_score(self, sim_score_file):
-        with open(sim_score_file, 'rt') as sim_score_file:
-            sim_score = {}
-            exec(sim_score_file.read(), {}, sim_score)
-            print("sim_score:", "hi")
-        return sim_score
-
 
 class ReferenceFile():
     def __init__(self, text):
@@ -42,8 +34,8 @@ class ReferenceFile():
 
 class Suggester():
     @staticmethod
-    def get_suggestions(word, known_words, sim_score): #work on this NEXT!
-        suggestions = sorted(known_words, key=lambda known_word:Suggester.levenshtein_distance(word, known_word, sim_score))
+    def get_suggestions(word, known_words): #work on this NEXT!
+        suggestions = sorted(known_words, key=lambda known_word:Levenshtein.distance(word, known_word))
         return suggestions[:3]
     
     def __init__(self, known_words=None):
@@ -53,25 +45,6 @@ class Suggester():
             return True
         else:
             return False
-    @staticmethod
-    def levenshtein_distance(word1, word2, sim_score):
-        min_edit_dist = list(range(len(word2)+1))
-        for index1, letters1 in enumerate(word1):
-            calc_dist = [index1+1]
-            for index2, letters2 in enumerate(word2):
-                if letters1 == letters2:
-                    cost = 0
-                else:
-                    sim_score_ref = tuple(sorted((letters1, letters2)))
-                    cost = sim_score.get(sim_score_ref, 1)
-                insert = calc_dist[index2]+1
-                sub = min_edit_dist[index2]+cost
-                delete = min_edit_dist[index2+1]+1
-                calc_dist.append(min(insert, delete, sub))
-            min_edit_dist=calc_dist
-        return min_edit_dist[-1]
-        
-
 
 class TextFile(ReferenceFile):
     def __init__(self, text):
@@ -221,6 +194,7 @@ class SpellcheckerApp:
         r_move_insert = self.text.index("@%d, %d"%(event.x, event.y))
         self.text.mark_set(tk.INSERT, r_move_insert)
         if "highlight" in self.text.tag_names(curr_index) and word and word in self.unknown_words:
+            self.curr_word_pos = curr_index
             self.text.tag_remove("selected", "1.0", tk.END)
             self.text.tag_add("selected", curr_index + " wordstart", curr_index + " wordend")
             self.text.tag_config("selected", background="blue")
@@ -332,17 +306,17 @@ class SpellcheckerApp:
         return None
     
     def accept_suggestion(self):
-        if self.unknown_words:
-            unknown_word = self.unknown_words[self.current_unknown_index]
-            suggestions = Suggester.get_suggestions(unknown_word, self.spellchecker.known_words,
-                                                    self.spellchecker.sim_score)
-            if suggestions:
-                self.suggestion_menu(unknown_word, suggestions)
+        if self.curr_word_pos:
+            word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
+            if word in [unknown_word[0] for unknown_word in self.spellchecker.unknown_words]:
+                suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words)
+                if suggestions:
+                    self.suggestion_menu(word, suggestions)
     
     def suggestion_menu(self, unknown_word, suggestions):
         menu = tk.Menu(self.text, tearoff=0)
         for suggestion in suggestions:
-            menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
+            menu.add_command(label=suggestion, command=lambda s=suggestion, uw=unknown_word: self.replace_unknown(uw, s))
         menu.post(self.text.winfo_pointerx(), self.text.winfo_pointery()) #will need to check on this--not sure about it
         
 
@@ -350,13 +324,16 @@ class SpellcheckerApp:
         return lambda: self.replace_unknown(unknown_word, suggestion)
 
     def replace_unknown(self, unknown_word, suggestion):
-        text = self.text.get("1.0", tk.END)
-        replaced_text = text.replace(unknown_word, suggestion)
-        self.text.delete("1.0", tk.END)
-        self.text.insert("1.0", replaced_text)
-        self.unknown_word_count -= 1
-        if unknown_word in self.unknown_words:
-            self.unknown_words.remove(unknown_word)
+        start_index = self.text.search(unknown_word, "1.0", tk.END)
+        if start_index:
+            end_index = self.text.index("{}+{}c".format(start_index, len(unknown_word)))
+            self.text.delete(start_index, end_index)
+            self.text.insert(start_index, suggestion)
+            self.spellchecker.known_words.add(suggestion)
+            if unknown_word in self.spellchecker.unknown_words:
+                self.spellchecker.unknown_words.remove(unknown_word)
+            self.text.tag_remove("highlight", start_index, "{}+{}c".format(start_index, len(suggestion)))
+            self.highlight_unknown()
         
     def delete_unknown(self):
         unknown_word = self.unknown_words[self.current_unknown_index]
@@ -371,10 +348,9 @@ if __name__ == "__main__":
 
     reference_file = TextFile(text_content)
     known_words_file = "words.txt"
-    sim_scores_file = "similarity_scores.py"
     ign_words_file = "ign_words.txt"
     window = tk.Tk()
-    spellchecker = Spellchecker(reference_file,known_words_file,sim_scores_file)
+    spellchecker = Spellchecker(reference_file,known_words_file)
     app = SpellcheckerApp(window, spellchecker)
     window.mainloop()
 #rest of globals
