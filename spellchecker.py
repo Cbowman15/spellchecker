@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
 import tkinter as tk
+from tkinter import simpledialog
 import re
 import time
 import Levenshtein
@@ -116,12 +117,14 @@ class SpellcheckerApp:
         self.text.bind("<Shift-Down>", self.overload_shift)
         self.text.bind("<KeyPress>", self.keypress_action)
         self.text.bind("<KeyRelease>", self.keyrelease_action)
+        
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
         self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_ignore.pack()
         self.curr_word_pos = None
         self.timer_delay = None
-        self.time_delay = 5000
+        self.time_delay = 500
+        self.menu=tk.Menu(self.text, tearoff=0)
         spellchecker.spell_check()
         self.highlight_unknown()
 
@@ -174,20 +177,32 @@ class SpellcheckerApp:
         
 
     def keypress_action(self, event):
-        if self.timer_delay:
-            self.window.after_cancel(self.timer_delay)
-        self.timer_delay = self.window.after(self.time_delay, self.processing_event)
-    
+        if event.char.isalpha():
+            if self.timer_delay:
+                self.window.after_cancel(self.timer_delay)
+            self.timer_delay = self.window.after(self.time_delay, self.processing_event)
+        
     def keyrelease_action(self, event):
         if self.timer_delay:
             self.window.after_cancel(self.timer_delay)
         self.timer_delay = self.window.after(self.time_delay, self.processing_event)
     
     def processing_event(self):
-        if self.text.edit_modified():
-            self.text.edit_modified(0)
-            self.highlight_unknown()
+        curr_index = self.text.index(tk.INSERT)
+        curr_word = self.get_curr_word(curr_index)
+        if curr_word:
+            suggestions = Suggester.get_suggestions(curr_word, self.spellchecker.known_words)
+        if self.timer_delay:
+            self.window.after_cancel(self.timer_delay)
             self.timer_delay = None
+    
+    def get_curr_word(self, curr_index):
+        start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
+        end_word = self.text.search(r'\M', curr_index, regexp=True)
+        if start_word and end_word:
+            return self.text.get(start_word, end_word)
+        return None
+
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
         word = self.text.get(curr_index + " wordstart", curr_index + " wordend")
@@ -202,6 +217,7 @@ class SpellcheckerApp:
             menu.add_command(label="Ignore", command=self.ignore_unknown)
             menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
             menu.add_command(label="Delete", command=self.delete_unknown)
+            menu.add_command(label="+Personal Dict", command=self.personal_dict)
             menu.post(event.x_root, event.y_root)
 
     def next_unknown(self):
@@ -341,6 +357,15 @@ class SpellcheckerApp:
         self.text.insert("insert", "<REPLACE>")
         self.unknown_word_count -= 1
         self.next_unknown()
+
+    def personal_dict(self):
+        new_word = self.text.get("current wordstart", "current wordend")
+        if new_word:
+            self.spellchecker.known_words.add(new_word)
+            self.text.tag_remove("highlight", "current wordstart","current wordend")
+            with open("pers_dict.txt", 'at') as personal_dict_file:
+                personal_dict_file.write(new_word+'\n')
+            self.highlight_unknown()
 
 if __name__ == "__main__":
     with open("example.txt", 'rt') as example_text_file:
