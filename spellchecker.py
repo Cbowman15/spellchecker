@@ -3,11 +3,13 @@ import bs4 #may not have downloaded correctly? (yellow underline)
 from bs4 import BeautifulSoup
 import PyPDF2
 from PyPDF2 import PdfReader
+from docx import Document
 import tkinter as tk
 from tkinter import filedialog
 import re
 import time
 import Levenshtein
+import threading
 import os
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, personal_dict):
@@ -20,11 +22,13 @@ class Spellchecker():
 
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
+        self.unknown_words = []
+        self.unknown_word_count = 0 #remember to print!
         for word in words_to_check:
             if word not in self.known_words and word not in self.ignored_words:
                 suggestions = Suggester.get_suggestions(word, self.known_words)
                 self.unknown_word_count += 1
-                self.unknown_words.append((word, suggestions))
+                self.unknown_words.append(word)
     def get_known_words(self, known_words_file, personal_dict):
         known_words = set()
         with open(known_words_file, "rt") as known_file:
@@ -68,15 +72,24 @@ class HTMLFile(ReferenceFile): #depending on how I want command line, may
         return html_content.split()
 
 class PDFFile(ReferenceFile):
+    def __init__(self, file_path):
+        super().__init__(None)
+        self.file_path = file_path
+    def parse(self):
+        pdf_reader = PdfReader(self.file_path)
+        pdf_content = []
+        for page in pdf_reader.pages:
+            text = page.extract_text()
+            if text:
+                pdf_content.append(text.strip())
+        self.text="\n".join(pdf_content)
+        return self.text
+
+class DocxFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
-        pdf_reader = PyPDF2.PdfReader(self.text)
-        pdf_content = ""
-        for num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[num]
-            pdf_content += page.extract_text()
-        return pdf_content.split()
+        return self.text.split()
 
 class SpellcheckerApp:
     def __init__(self, window, spellchecker):
@@ -135,10 +148,10 @@ class SpellcheckerApp:
         self.text.bind("<KeyRelease>", self.keyrelease_action)
         self.text.bind("<Control-z>", self.new_undo)
         self.text.bind("<Control-y>", self.new_redo)
-        self.window.bind("<Control-o>", self.open_file)
+        self.window.bind("<Control-o>", self.open_file_two)
         self.top_menu = tk.Menu(window)
         self.file_menu = tk.Menu(self.top_menu, tearoff=0)
-        self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file)
+        self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file_two)
         window.config(menu=self.top_menu)
         self.top_menu.add_cascade(label = "File", menu= self.file_menu)
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
@@ -151,25 +164,36 @@ class SpellcheckerApp:
         spellchecker.spell_check()
         self.highlight_unknown()
 
-    def open_file(self, event=None):
+    def open_file_one(self, file_to_open):
+        if file_to_open.lower().endswith('.txt'):
+            with open(file_to_open, 'rt') as file:
+                text_content = file.read()
+            self.spellchecker.reference_file = TextFile(text_content)
+        elif file_to_open.lower().endswith('.html') or file_to_open.lower().endswith('.htm'):
+            with open(file_to_open, 'rt') as file:
+                text_content = file.read()
+            self.spellchecker.reference_file= HTMLFile(text_content)
+        elif file_to_open.lower().endswith('.pdf'):
+            self.spellchecker.reference_file = PDFFile(file_to_open)
+            text_content = self.spellchecker.reference_file.parse()
+        elif file_to_open.lower().endswith('.docx'):
+            document = Document(file_to_open)
+            text_content = '\n'.join(paragraph.text for paragraph in document.paragraphs if paragraph.text)
+            self.spellchecker.reference_file = DocxFile(text_content)
+        self.update_window(text_content)
+    
+    def update_window(self, text_content):
+        if text_content:
+            self.window.after(0, self.text.delete, "1.0", tk.END)
+            self.window.after(0, self.text.insert, tk.END, text_content)
+            self.spellchecker.reference_file.text = text_content
+            self.window.after(0, self.spellchecker.spell_check)
+            self.window.after(0, self.highlight_unknown)
+
+    def open_file_two(self, event=None):
         file_to_open = filedialog.askopenfilename()
         if file_to_open:
-            if file_to_open.lower().endswith('.txt'):
-                with open(file_to_open, 'rt') as file:
-                    text_content = file.read()
-                self.spellchecker.reference_file = TextFile(text_content)
-            elif file_to_open.lower().endswith('.html') or file_to_open.lower().endswith('.htm'):
-                with open(file_to_open, 'rt') as file:
-                    text_content = file.read()
-                self.spellchecker.reference_file= HTMLFile(text_content)
-            elif file_to_open.lower().endswith('pdf'):
-                with open(file_to_open, 'rt') as file:
-                    text_content = file.read()
-                self.spellchecker.reference_file = PDFFile(text_content)
-            self.spellchecker.spell_check()
-            self.text.delete("1.0", tk.END)
-            self.text.insert(tk.END, self.spellchecker.reference_file.text)
-            self.highlight_unknown()
+            threading.Thread(target=self.open_file_one, args=(file_to_open,), daemon=True).start()
         return "break"
 
     def on_arrow_mode(self, event):
