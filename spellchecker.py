@@ -202,11 +202,6 @@ class SpellcheckerApp:
             self.window.after_cancel(self.timer_delay)
             self.timer_delay = None
     
-    def update_hlight(self):
-        self.text.tag_remove("highlight", "1.0", tk.END)
-        for (start_word, end_word) in self.highlight_indexes:
-            self.text.tag_add("highlight", start_word, end_word)
-    
     def get_curr_word(self, curr_index):
         start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
         end_word = self.text.search(r'\M', curr_index, regexp=True)
@@ -227,7 +222,6 @@ class SpellcheckerApp:
             menu = tk.Menu(self.text, tearoff=1)
             menu.add_command(label="Ignore", command=self.ignore_unknown)
             menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
-            menu.add_command(label="Delete", command=self.delete_unknown)
             menu.add_command(label="+Personal Dict", command=self.personal_dict)
             menu.post(event.x_root, event.y_root)
 
@@ -361,20 +355,6 @@ class SpellcheckerApp:
                 self.spellchecker.unknown_words.remove(unknown_word)
             self.text.tag_remove("highlight", start_index, "{}+{}c".format(start_index, len(suggestion)))
             self.highlight_unknown()
-        
-    def delete_unknown(self):
-        if self.highlight_indexes and (self.current_unknown_index<len(self.highlight_indexes)):
-            (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
-            del_word = self.text.get(start_index, end_index)
-            if del_word in self.unknown_words:
-                self.text.delete(start_index, end_index)
-                if del_word in self.spellchecker.ignored_words:
-                    self.unknown_words.remove(del_word)
-                self.text.insert(start_index, "<REPLACE>")
-                self.spellchecker.unknown_word_count -= 1
-                self.highlight_indexes.pop(self.current_unknown_index)
-                self.update_hlight()
-                self.next_unknown()
 
     def personal_dict(self):
         if self.curr_word_pos:
@@ -384,6 +364,7 @@ class SpellcheckerApp:
                 if new_word and (new_word not in self.spellchecker.known_words):
                     self.spellchecker.known_words.add(new_word)
                     self.text.tag_remove("highlight", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
+                    self.text.tag_remove("selected", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
                     with open(personal_dict, 'rt') as personal_dict_file:
                         if new_word not in personal_dict:
                             with open(personal_dict, 'at') as personal_dict_file:
