@@ -22,11 +22,12 @@ class Spellchecker():
     def spell_check(self):
         words_to_check = self.reference_file.parse() #check this phrase
         for index, word in enumerate(words_to_check):
-            known = (word.lower() in self.known_words) or (word in self.known_words)
-            if_start_sent = self.start_sentence(index, words_to_check)
-            if not known and not (if_start_sent and word.istitle()):
-                suggestions = Suggester.get_suggestions(word.lower(), self.known_words)
-                self.unknown_words.append((word, suggestions))
+            if re.match(r"^[a-zA-Z'-]+$", word):
+                known = (word.lower() in self.known_words) or (word in self.known_words)
+                if_start_sent = self.start_sentence(index, words_to_check)
+                if not known and not (if_start_sent and word.istitle()):
+                    suggestions = Suggester.get_suggestions(word.lower(), self.known_words)
+                    self.unknown_words.append((word, suggestions))
                 
 
     def start_sentence(self, word_index, words_to_check):
@@ -500,7 +501,7 @@ class SpellcheckerApp:
             self.text.tag_config("selected", background="blue")
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
-            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.unknown_words))
+            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
             self.add_listbox()
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
             self.set_insertion(start_index)
@@ -510,12 +511,12 @@ class SpellcheckerApp:
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
+        self.add_listbox()
             
     def previous_unknown(self):
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
-            self.add_listbox()
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
             self.set_insertion(start_index)
             self.text.tag_remove("highlight", "1.0", tk.END)
@@ -525,6 +526,7 @@ class SpellcheckerApp:
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
+        self.add_listbox()
         
     
     def set_insertion(self, pos):
