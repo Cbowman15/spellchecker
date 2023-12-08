@@ -151,11 +151,15 @@ class SpellcheckerApp:
         self.text.bind("<Control-z>", self.new_undo)
         self.text.bind("<Control-y>", self.new_redo)
         self.window.bind("<Control-o>", self.open_file_two)
+        self.window.bind("<Control-s>", self.save_file)
+        self.window.bind("<Control-S>", self.save_as)
         self.top_menu = tk.Menu(window)
         self.file_menu = tk.Menu(self.top_menu, tearoff=0)
         self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file_two)
         window.config(menu=self.top_menu)
         self.top_menu.add_cascade(label = "File", menu= self.file_menu)
+        self.file_menu.add_command(label="Save", accelerator="Ctrl+s", command=self.save_file)
+        self.file_menu.add_command(label="Save As", accelerator="Ctrl+S", command=self.save_as)
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
         self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_ignore.pack()
@@ -163,10 +167,12 @@ class SpellcheckerApp:
         self.timer_delay = None
         self.time_delay = 500
         self.menu=tk.Menu(self.text, tearoff=0)
+        self.working_file = None
         spellchecker.spell_check()
         self.highlight_unknown()
 
     def open_file_one(self, file_to_open):
+        self.working_file = file_to_open
         if file_to_open.lower().endswith('.txt'):
             with open(file_to_open, 'rt') as file:
                 text_content = file.read()
@@ -183,6 +189,7 @@ class SpellcheckerApp:
             text_content = '\n'.join(paragraph.text for paragraph in document.paragraphs if paragraph.text)
             self.spellchecker.reference_file = DocxFile(text_content)
         self.update_window(text_content)
+        self.title(os.path.basename(file_to_open))
     
     def update_window(self, text_content):
         if text_content:
@@ -197,7 +204,27 @@ class SpellcheckerApp:
         if file_to_open:
             threading.Thread(target=self.open_file_one, args=(file_to_open,), daemon=True).start()
         return "break"
+    
+    def title(self, title):
+        self.window.title("{}".format(title))
 
+    def save_file(self, event=None):
+        if self.working_file:
+            with open(self.working_file, 'wt') as save_file:
+                saving_text = self.text.get("1.0", tk.END)
+                save_file.write(saving_text.rstrip())
+            self.title(os.path.basename(self.working_file))
+        else:
+            self.save_as(event)
+
+    def save_as(self, event=None):
+        save_file = filedialog.asksaveasfilename(filetypes=[("All Files", "*.*")])
+        if save_file:
+            with open(save_file, 'wt') as save_as_file:
+                saving_text = self.text.get("1.0", tk.END)
+                save_as_file.write(saving_text.rstrip())
+                self.working_file = save_file
+                self.title(os.path.basename(save_file))
     def on_arrow_mode(self, event):
         if not self.arrow_key_mode and (event.state & 0x1):
             self.arrow_key_count += 1
