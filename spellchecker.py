@@ -161,7 +161,8 @@ class SpellcheckerApp:
         self.text.bind("<KeyRelease>", self.keyrelease_action)
         self.text.bind("<Control-z>", self.new_undo)
         self.text.bind("<Control-y>", self.new_redo)
-        self.text.bind("<Control-t>", self.translate)
+        self.text.bind("<Control-t>", self.open_trans)
+        self.text.bind("<Any-KeyRelease>", self.refresh)
         self.window.bind("<Control-o>", self.open_file_two)
         self.window.bind("<Control-s>", self.save_file)
         self.window.bind("<Control-S>", self.save_as)
@@ -182,6 +183,7 @@ class SpellcheckerApp:
         self.text.bind("<FocusOut>", self.focus_out)
         self.text.bind("<FocusIn>", self.focus_in)
         self.curr_word_pos = None
+        self.id = None
         self.timer_delay = None
         self.time_delay = 500
         self.menu=tk.Menu(self.text, tearoff=0)
@@ -189,6 +191,19 @@ class SpellcheckerApp:
         spellchecker.spell_check()
         self.translator = Translator()
         self.highlight_unknown()
+
+    def refresh(self, event=None):
+        if self.id is not None:
+            self.window.after_cancel(self.id)
+        self.id = self.window.after(2000, self.chk_again)
+
+    def chk_again(self):
+        cursor_pos = self.text.index(tk.INSERT)
+        self.id = None
+        self.spellchecker.spell_check()
+        self.highlight_unknown()
+        self.text.mark_set(tk.INSERT, cursor_pos)
+        self.text.see(tk.INSERT)
 
     def open_file_one(self, file_to_open):
         self.working_file = file_to_open
