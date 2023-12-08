@@ -10,6 +10,8 @@ import time
 import Levenshtein
 import threading
 import os
+from fuzzywuzzy import process
+from googletrans import Translator, LANGUAGES
 class Spellchecker():
     def __init__(self, reference_file, known_words_file, personal_dict):
         self.reference_file = reference_file
@@ -107,6 +109,7 @@ class SpellcheckerApp:
             
         text_content = ' ' + text_content
         self.text.insert(tk.END, text_content)
+        self.lang_entry = tk.Entry(self.frm)
         self.initial = True
         self.current_unknown_index = 0
         self.highlight_indexes = []
@@ -121,10 +124,18 @@ class SpellcheckerApp:
         self.btn_undo.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
         self.btn_redo = tk.Button(self.frm, text="REDO", command=self.redo)
         self.btn_redo.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SE)
+        self.btn_translate = tk.Button(self.frm, text="TRANSLATE", command=self.translate)
+        self.btn_close_trans = tk.Button(self.frm, text="CLOSE TRANSLATE", command=self.close_trans)
         self.btn_undo.pack()
         self.btn_redo.pack()
         self.undo_hist = []
         self.redo_hist = []
+        self.btn_next_unknown["takefocus"] = False
+        self.btn_prev_unknown["takefocus"] = False
+        self.btn_undo["takefocus"] = False
+        self.btn_redo["takefocus"] = False
+        self.btn_translate["takefocus"] = False
+        self.btn_close_trans["takefocus"] = False
         self.text.config(undo=False)
         self.spellchecker = spellchecker
         self.unknown_words = spellchecker.unknown_words
@@ -150,25 +161,33 @@ class SpellcheckerApp:
         self.text.bind("<KeyRelease>", self.keyrelease_action)
         self.text.bind("<Control-z>", self.new_undo)
         self.text.bind("<Control-y>", self.new_redo)
+        self.text.bind("<Control-t>", self.translate)
         self.window.bind("<Control-o>", self.open_file_two)
         self.window.bind("<Control-s>", self.save_file)
         self.window.bind("<Control-S>", self.save_as)
         self.top_menu = tk.Menu(window)
         self.file_menu = tk.Menu(self.top_menu, tearoff=0)
-        self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file_two)
-        window.config(menu=self.top_menu)
         self.top_menu.add_cascade(label = "File", menu= self.file_menu)
+        self.file_menu.add_command(label = "Open", accelerator="Ctrl+O", command=self.open_file_two)
         self.file_menu.add_command(label="Save", accelerator="Ctrl+s", command=self.save_file)
         self.file_menu.add_command(label="Save As", accelerator="Ctrl+S", command=self.save_as)
+        self.tool_menu = tk.Menu(self.top_menu, tearoff=0)
+        self.top_menu.add_cascade(label="Tools", menu=self.tool_menu)
+        self.tool_menu.add_command(label="Translate", accelerator="Ctrl+t", command=self.open_trans)
+        window.config(menu=self.top_menu)
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
         self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
         self.btn_ignore.pack()
+        self.last_select = None
+        self.text.bind("<FocusOut>", self.focus_out)
+        self.text.bind("<FocusIn>", self.focus_in)
         self.curr_word_pos = None
         self.timer_delay = None
         self.time_delay = 500
         self.menu=tk.Menu(self.text, tearoff=0)
         self.working_file = None
         spellchecker.spell_check()
+        self.translator = Translator()
         self.highlight_unknown()
 
     def open_file_one(self, file_to_open):
@@ -268,6 +287,17 @@ class SpellcheckerApp:
                 self.next_unknown()
             else:
                 pass
+    
+    def focus_out(self, event=None):
+        if self.text.tag_ranges('sel'):
+            self.last_select = (self.text.index("sel.first"), self.text.index("sel.last"))
+
+    def focus_in(self, event=None):
+        if self.last_select:
+            self.text.tag_add("sel", self.last_select[0], self.last_select[1])
+            self.text.mark_set("insert", self.last_select[0])
+            self.text.see("insert")
+            self.last_select = None
 
     def overload_shift(self, event):
         if event.keysym == "Up" and (event.state & 0x1):
@@ -355,6 +385,48 @@ class SpellcheckerApp:
             menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
             menu.add_command(label="+Personal Dict", command=self.personal_dict)
             menu.post(event.x_root, event.y_root)
+
+    def autofix_lang(self, typed_lang):
+        lang = process.extractOne(typed_lang, LANGUAGES.values())
+        if lang:
+            lang_name = lang[0]
+        else:
+            None
+        for lang_key, name in LANGUAGES.items():
+            if name == lang_name:
+                return lang_key
+        return 'en'
+
+    def translate(self, event=None):
+        self.lang_entry.pack(side=tk.TOP, fill=tk.X,padx=3,pady=3)
+        self.btn_close_trans.pack(side=tk.BOTTOM, fill=tk.X,pady=3)
+        self.translate_mode = True
+        if not self.text.tag_ranges("sel"):
+            return "break"
+        selected = self.text.get("sel.first", "sel.last")
+        typed_lang = self.lang_entry.get().lower()
+        if not typed_lang:
+            return "break"
+        lang_key = self.autofix_lang(typed_lang)
+        if lang_key:
+            trans_text = self.translator.translate(selected, dest=lang_key).text
+            if trans_text:    
+                self.text.delete("sel.first", "sel.last")
+                self.text.insert("insert", trans_text)
+        self.text.focus_set()
+        return "break"
+    
+    def open_trans(self, event=None):
+        self.lang_entry.pack(side=tk.TOP, fill=tk.X, padx=3,pady=3)
+        self.btn_translate.pack(side=tk.TOP, padx=3,pady=3)
+        self.btn_close_trans.pack(side=tk.BOTTOM, pady=3)
+        self.lang_entry.focus_set()
+
+    def close_trans(self):
+        self.lang_entry.pack_forget()
+        self.btn_close_trans.pack_forget()
+        self.btn_translate.pack_forget()
+        self.translate_mode=False
 
     def next_unknown(self):
         if self.highlight_indexes:
