@@ -1,8 +1,7 @@
 
 import bs4 #may not have downloaded correctly? (yellow underline)
 from bs4 import BeautifulSoup
-import PyPDF2
-from PyPDF2 import PdfReader
+import fitz
 from docx import Document
 import tkinter as tk
 from tkinter import filedialog
@@ -82,14 +81,11 @@ class PDFFile(ReferenceFile):
         super().__init__(None)
         self.file_path = file_path
     def parse(self):
-        pdf_reader = PdfReader(self.file_path)
-        pdf_content = []
-        for page in pdf_reader.pages:
-            text = page.extract_text()
-            if text:
-                pdf_content.append(text.strip())
-        self.text="\n".join(pdf_content)
-        return self.text
+        with fitz.open(self.file_path) as document:
+            content = ""
+            for page in document:
+                content += page.get_text()
+        return content
 
 class DocxFile(ReferenceFile):
     def __init__(self, text):
@@ -388,7 +384,7 @@ class SpellcheckerApp:
                 for match in re.finditer(r'\b[a-zA-Z]+\b', line_text):
                     word=match.group()
                     lower_word = word.lower()
-                    exclusions = word.istitle() and lower_word in self.sepllchecker.known_words
+                    exclusions = word.istitle() and lower_word in self.spellchecker.known_words
                     capital_known_word = (word.isupper() or (
                         word.istitle() and not punctuation_mark)) and lower_word in self.spellchecker.known_words
                     start_pos = "{}+{}c".format(line_start, match.start())
@@ -406,6 +402,7 @@ class SpellcheckerApp:
                 self.text.tag_config("highlight", background="yellow")
                 self.set_insertion("1.0")
                 self.text.tag_bind("highlight", "<Button-1>", self.show_menu)
+
 
     def hlight_word(self, word, line_start, now_known_indexes):
         match = re.search(r'\b{}\b'.format(re.escape(word)), self.text.get(line_start, line_start+"lineend"))
