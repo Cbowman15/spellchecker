@@ -17,7 +17,6 @@ class Spellchecker():
         self.reference_file = reference_file
         self.known_words = self.get_known_words(known_words_file, personal_dict)
         self.ignored_words = set()
-        self.unknown_word_count = 0 #remember to print at the end
         self.unknown_words = []
         
     def spell_check(self):
@@ -27,8 +26,8 @@ class Spellchecker():
             if_start_sent = self.start_sentence(index, words_to_check)
             if not known and not (if_start_sent and word.istitle()):
                 suggestions = Suggester.get_suggestions(word.lower(), self.known_words)
-                self.unknown_word_count += 1
                 self.unknown_words.append((word, suggestions))
+                
 
     def start_sentence(self, word_index, words_to_check):
         if word_index == 0:
@@ -106,7 +105,10 @@ class SpellcheckerApp:
 
         with open("example.txt", 'rt') as example_text_file:
             text_content = example_text_file.read()
-            
+
+        self.sug_listbox = tk.Listbox(self.frm, width=40,height=3)
+        self.sug_listbox.pack(side=tk.BOTTOM)
+        self.sug_listbox.bind("<<ListboxSelect>>", self.chosen_listbox)    
         self.text.insert(tk.END, text_content)
         self.lang_entry = tk.Entry(self.frm)
         self.initial = True
@@ -177,8 +179,11 @@ class SpellcheckerApp:
         self.tool_menu.add_command(label="Spellcheck", accelerator="Ctrl+q", command=self.refresh)
         window.config(menu=self.top_menu)
         self.btn_ignore = tk.Button(self.frm, text="IGNORE", command=self.ignore_unknown)
-        self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SW)
+        self.btn_ignore.pack(side=tk.RIGHT, padx=3, pady=3, anchor=tk.SE)
         self.btn_ignore.pack()
+        self.btn_dict = tk.Button(self.frm, text="+DICTIONARY", command=self.add_dict, width=12)
+        self.btn_dict.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
+        self.dict_off()
         self.last_select = None
         self.text.bind("<FocusOut>", self.focus_out)
         self.text.bind("<FocusIn>", self.focus_in)
@@ -189,10 +194,13 @@ class SpellcheckerApp:
         self.working_file = None
         self.translator = Translator()
 
-    def refresh(self):
-        text_content = self.text.get("1.0", tk.END)
-        self.spellchecker.reference_file.text = text_content
+    def refresh(self, event=None):
+        start_index = self.text.index("sel.first")
+        end_index = self.text.index("sel.last")
+        selected = self.text.get(start_index, end_index)
+        self.spellchecker.reference_file.text = selected
         self.spellchecker.spell_check()
+        self.add_listbox()
         self.highlight_unknown()
 
     def open_file_one(self, file_to_open):
@@ -257,6 +265,7 @@ class SpellcheckerApp:
                 self.btn_next_anchor = tk.SE
                 self.btn_prev_anchor = tk.SW
                 self.hide_btns()
+                self.dict_on()
     
     def off_arrow_mode(self, event):
         if self.arrow_key_mode and (event.state & 0x1):
@@ -269,6 +278,7 @@ class SpellcheckerApp:
                 self.btn_undo_anchor = tk.LEFT
                 self.btn_redo_anchor = tk.LEFT
                 self.show_btns()
+                self.dict_off()
     
     def hide_btns(self):
         self.btn_next_unknown.pack_forget()
@@ -341,6 +351,55 @@ class SpellcheckerApp:
         if self.timer_delay:
             self.window.after_cancel(self.timer_delay)
             self.timer_delay = None
+    
+    def dict_off(self):
+        self.btn_dict.pack_forget()
+        self.sug_listbox.pack_forget()
+    
+    def dict_on(self):
+        self.btn_dict.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
+        self.sug_listbox.pack(side=tk.BOTTOM, padx=3,pady=3)
+    
+    def get_cur_unknown(self):
+        if not self.unknown_words or (self.current_unknown_index>=len(self.unknown_words)):
+            return None
+        return self.unknown_words[self.current_unknown_index][0]
+    
+    def add_dict(self):
+        curr_word = self.get_cur_unknown()
+        if curr_word:
+            curr_lower_word = curr_word.lower()
+            self.spellchecker.known_words.add(curr_lower_word)
+            unknowns = []
+            for word, suggestions in self.unknown_words:
+                if word.lower() != curr_lower_word:
+                    unknowns.append((word, suggestions))
+            self.unknown_words = unknowns
+            self.highlight_unknown()
+            with open(self.spellchecker.personal_dict, 'at') as dict_file:
+                dict_file.write(curr_word+'\n')
+    
+    def chosen_listbox(self, event):
+        if not self.sug_listbox.curselection():
+            return
+        lb_index = self.sug_listbox.curselection()[0]
+        suggestion = self.sug_listbox.get(lb_index)
+        (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+        self.text.delete(start_index, end_index)
+        self.text.insert(start_index, suggestion)
+        self.update_known(self.text.get(start_index, "{}+{}c".format(
+            start_index, len(suggestion)
+        )), suggestion)
+        self.text.focus_set()
+        self.text.mark_set(tk.INSERT, start_index)
+        self.next_unknown()
+
+    def add_listbox(self):
+        self.sug_listbox.delete(0, tk.END)
+        if self.current_unknown_index<(len(self.unknown_words)):
+            (curr_word, suggestions) = self.unknown_words[self.current_unknown_index]
+        for suggestion in suggestions:
+            self.sug_listbox.insert(tk.END, suggestion)
 
     def save_undo(self):
         text = self.text.get("1.0", tk.END)
@@ -441,7 +500,8 @@ class SpellcheckerApp:
             self.text.tag_config("selected", background="blue")
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
-            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
+            self.current_unknown_index = (self.current_unknown_index+1) % (len(self.unknown_words))
+            self.add_listbox()
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
             self.set_insertion(start_index)
             for index, (start, end) in enumerate(self.highlight_indexes):
@@ -455,6 +515,7 @@ class SpellcheckerApp:
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
+            self.add_listbox()
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
             self.set_insertion(start_index)
             self.text.tag_remove("highlight", "1.0", tk.END)
