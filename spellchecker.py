@@ -384,6 +384,8 @@ class SpellcheckerApp:
         return self.unknown_words[self.current_unknown_index][0]
     
     def add_dict(self):
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
         curr_word = self.get_cur_unknown()
         if curr_word:
             curr_lower_word = curr_word.lower()
@@ -393,11 +395,16 @@ class SpellcheckerApp:
                 if word.lower() != curr_lower_word:
                     unknowns.append((word, suggestions))
             self.unknown_words = unknowns
-            self.highlight_unknown()
             with open(self.spellchecker.personal_dict_file_path, 'at') as dict_file:
                 dict_file.write(curr_word+'\n')
+            self.highlight_unknown()
+        self.text.yview_moveto(curr_view[0])
+        self.text.mark_set(tk.INSERT, curr_index)
+        self.text.see(curr_index)
     
     def chosen_listbox(self, event):
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
         if not self.sug_listbox.curselection():
             return
         lb_index = self.sug_listbox.curselection()[0]
@@ -408,8 +415,9 @@ class SpellcheckerApp:
         self.update_known(self.text.get(start_index, "{}+{}c".format(
             start_index, len(suggestion)
         )), suggestion)
-        self.text.focus_set()
-        self.text.mark_set(tk.INSERT, start_index)
+        self.text.yview_moveto(curr_view[0])
+        self.text.mark_set(tk.INSERT, curr_index)
+        self.text.see(curr_index)
         self.next_unknown()
         self.add_listbox()
 
@@ -608,6 +616,7 @@ class SpellcheckerApp:
     def ignore_unknown(self):
         if not self.highlight_indexes:
             return
+        curr_view = self.text.yview()
         curr_index = self.text.index(tk.INSERT)
         curr_word_start = curr_index + " wordstart"
         curr_word_end = curr_index + " wordend"
@@ -621,6 +630,7 @@ class SpellcheckerApp:
             with open(self.spellchecker.ignored_words_file_path, 'at') as ignored_file:
                 ignored_file.write(word + '\n')
             self.highlight_unknown()
+            self.text.yview_moveto(curr_view[0])
     
     def ignore_all(self, event=None):
         curr_word = self.get_curr_word(self.text.index(tk.INSERT))
@@ -675,6 +685,8 @@ class SpellcheckerApp:
         return lambda: self.replace_unknown(unknown_word, suggestion)
 
     def replace_unknown(self, unknown_word, suggestion):
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
         start_index = self.text.search(unknown_word, "1.0", tk.END)
         while start_index:
             end_index = self.text.index("{}+{}c".format(start_index, len(unknown_word)))
@@ -689,6 +701,9 @@ class SpellcheckerApp:
                     self.curr_word_pos = None
                     break
             start_index = self.text.search(unknown_word, end_index, tk.END)
+        self.text.yview_moveto(curr_view[0])
+        self.text.mark_set(tk.INSERT, curr_index)
+        self.text.see(curr_index)
     
     def update_known(self, prev, new):
         if prev in self.unknown_words:
@@ -698,6 +713,8 @@ class SpellcheckerApp:
         self.highlight_unknown()
 
     def personal_dict(self):
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
         if self.curr_word_pos:
             new_word = self.text.get(self.curr_word_pos+" wordstart",self.curr_word_pos+" wordend")
             if new_word:
@@ -711,6 +728,9 @@ class SpellcheckerApp:
                             with open(personal_dict_file_path, 'at') as personal_dict_file:
                                 personal_dict_file.write(new_word+'\n')
                     self.highlight_unknown()
+                    self.text.yview_moveto(curr_view[0])
+                    self.text.mark_set(tk.INSERT, curr_index)
+                    self.text.see(curr_index)
 
 if __name__ == "__main__":
     
