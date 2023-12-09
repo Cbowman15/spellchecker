@@ -281,19 +281,55 @@ class TextFile(ReferenceFile):
 
 #subclass parsing
 class HTMLFile(ReferenceFile):
+    """
+    Subclass of ReferenceFile, specifically for handling and parsing HTML content.
+    
+    Parses HTML content, extracting text with Beautiful Soup
+    """
     def __init__(self, text):
+        """
+        Initializes parent class with HTML content, to be parsed
+        
+        Arguments:
+        -text (str): string containing HTML content
+        """
         super().__init__(text)
     def parse(self):
+        """
+        Parses HTML content, extracting text, returning list of words.
+        
+        Uses BeautifulSoup for HTML parsing
+        
+        Returns:
+        -list: list of strings, which are words from HTML content
+        """
         soup = BeautifulSoup(self.text, "lxml")
         html_content = soup.get_text()
         return html_content.split()
 
 #subclass parsing
 class PDFFile(ReferenceFile):
+    """
+    Subclass of ReferenceFile, specifically for handling and parsing PDF content.
+    
+    Parses PDF content, extracting text with fitz
+    """
     def __init__(self, file_path):
+        """
+        Initializes instance of PDFFile, with file path to PDF file.
+        
+        Arguments:
+        -file_path (str): file path to PDF file
+        """
         super().__init__(None)
         self.file_path = file_path
     def parse(self):
+        """
+        Opens PDF file, extracting text from each page, combining it into one string.
+        
+        Returns:
+        str: combined text from PDF file
+        """
         with fitz.open(self.file_path) as document:
             content = ""
             for page in document:
@@ -302,22 +338,92 @@ class PDFFile(ReferenceFile):
 
 #subclass parsing
 class DocxFile(ReferenceFile):
+    """
+    Subclass of ReferenceFile, specifically for handling and parsing content
+    from .docx files.
+    
+    Initialized with content from .docx file, and then parses and extracts text
+    from it.
+    """
     def __init__(self, text):
+        """
+        Initializes instance of DocxFile, with file path to a .docx file.
+        
+        Arguments:
+        -file_path (str): file path to .docx file
+        """
         super().__init__(text)
     def parse(self):
+        """
+        Opens .docx file, extracting text from each paragraph into single list.
+        
+        Returns:
+        -list: list of words from .docx file
+        """
         return self.text.split()
 
 #'the' GUI
 class SpellcheckerApp:
     """
-    'The' GUI
+    'The' GUI. The SpellcheckerApp class integrates the functions of a spellchecker
+     and text editor, while also providing the ability for translation. It is an
+     interactive application, in which a user can open files, edit them, and check
+     for misspellings.
     
     Attributes:
-    window (tk.Tk): main application window
-    
+    -window (tk.Tk): main application window
+    -frm (tk.Frame): main frame widget for other widgets
+    -text (tk.Text): main text widget for the display and edit of textual file content
+    -sug_listbox (tk.Listbox): listbox widget for displaying suggestions for
+     misspelled words (non-interactive)
+    -lang_entry (tk.Entry): entry widget to input language for translation feature
+    -btn_next_unknown (tk.Button): button to move to next unknown word in text
+    -btn_prev_unknown (tk.Button): button to move to previous unknown word in text
+    -btn_undo (tk.Button): button for undo text feature
+    -btn_redo (tk.Button): button for redo text feature
+    -btn_translate (tk.Button): button, triggers translation of currently highlighted text
+    -btn_close_trans (tk.Button): button, closes translation feature
+    -btn_ignore (tk.Button): button to ignore spelling suggestion for current word
+    -btn_dict (tk.Button): button to add current word to personal dictionary
+    -top_menu (tk.Menu): top menu of application, which provides file and tools options
+    -file_menu (tk.Menu): a menu in top menu for file options (open, save, save as)
+    -tool_menu (tk.Menu): a menu in top menu for tool options (translate, spellcheck)
+    -spellchecker (Spellchecker): initialized Spellchecker object, referenced for
+     spellchecking capabilities
+    -unknown_words (list): list of words identified as unknown by spellchecker
+    -undo_hist (list): list of history of actions by user in modification of text;
+     used for undo feature
+    -redo_hist (list): list of history of actions by user in modification of text;
+     used for redo feature
+    -initial (bool): a flag, initially set tot True, tracking initial state of application
+    -current_unknown_index (int): index to track current word, in unknown words
+     list, being modified
+    -highlight_indexes (tuple list): list with start and end index positions of
+     the highlighted words in the text
+    -previous_highlight (str or None): the previous highlighted word
+    -arrow_key_mode (bool): a flag that checks whether arrow mode is activated, initially
+     set to False
+    -arrow_last_time (float): the time at which the arrow key was last pressed, used for
+     activation purposes
+    -arrow_time_reset (int): time duration required to pass without activation of arrow mode
+     in order for press count to reset
+    -arrow_key_count (int): counts arrow key presses, allowing for activation of arrow mode
+    -arrow_key_req (int): number of arrow key presses required to activate arrow mode
+    -last_select (str/None): last selected word
+    -curr_word_pos (tuple/None): current position of word being modified
+    -timer_delay (int/None): stored time for delayed actions
+    -time_delay (int): time for delay, before given action triggered
+    -menu (tk.Menu): pop-up menu, providing modification options for word under cursor
+    -working_file (str): path of currently opened text file
+    -translator (Translator): object of Translator class; used for translation feature
+
     Arguments:
-    window (tk.Tk): Tkinter window
-    spellchecker (Spellchecker): initialized Spellchecker object"""
+    -window (tk.Tk): Tkinter window
+    -spellchecker (Spellchecker): initialized Spellchecker object
+
+    Methods: (too many!)
+    -handles interactions between attributes
+    """
     def __init__(self, window, spellchecker):
         self.window = window
         self.window.title("Spellchecker EECE2140")
