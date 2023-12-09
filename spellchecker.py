@@ -1,5 +1,3 @@
-
-import bs4 #may not have downloaded correctly? (yellow underline)
 from bs4 import BeautifulSoup
 import fitz
 from docx import Document
@@ -12,11 +10,15 @@ import threading
 import os
 from fuzzywuzzy import process
 from googletrans import Translator, LANGUAGES
+import argparse
+
 class Spellchecker():
-    def __init__(self, reference_file, known_words_file, personal_dict):
+    def __init__(self, reference_file, known_words_file_path, personal_dict_file_path, ignored_words_file_path):
         self.reference_file = reference_file
-        self.known_words = self.get_known_words(known_words_file, personal_dict)
-        self.ignored_words = set()
+        self.known_words = self.get_known_words(known_words_file_path, personal_dict_file_path)
+        self.ignored_words_file_path = ignored_words_file_path
+        self.personal_dict_file = personal_dict_file_path
+        self.ignored_words = load_files(ignored_words_file_path)
         self.unknown_words = []
         
     def spell_check(self):
@@ -36,12 +38,14 @@ class Spellchecker():
         prev_word = words_to_check[word_index-1]
         return prev_word[-1] in ".!?;"
 
-    def get_known_words(self, known_words_file, personal_dict):
+    def get_known_words(self, known_words_file_path, personal_dict_file_path):
         known_words = set()
-        with open(known_words_file, "rt") as known_file:
-            known_words.update(known_file.read().split())
-        with open(personal_dict, "rt") as personal_dict_file:
-            known_words.update(personal_dict_file.read().split())
+        if os.path.isfile(known_words_file_path):
+            with open(known_words_file_path, 'rt',encoding='utf-8') as known_file:
+                known_words.update(known_file.read().split())
+        if os.path.isfile(personal_dict_file_path):
+            with open(personal_dict_file_path, 'rt') as personal_dict_file:
+                known_words.update(personal_dict_file.read().split())
         return known_words
 
 class ReferenceFile():
@@ -388,7 +392,7 @@ class SpellcheckerApp:
                     unknowns.append((word, suggestions))
             self.unknown_words = unknowns
             self.highlight_unknown()
-            with open(self.spellchecker.personal_dict, 'at') as dict_file:
+            with open(self.spellchecker.personal_dict_file_path, 'at') as dict_file:
                 dict_file.write(curr_word+'\n')
     
     def chosen_listbox(self, event):
@@ -610,7 +614,7 @@ class SpellcheckerApp:
             self.text.tag_remove("highlight", curr_word_start, curr_word_end)
             self.text.tag_remove("selected", curr_word_start, curr_word_end)
             self.highlight_unknown()
-            with open("ign_words.txt", 'at') as ignored_file:
+            with open(self.spellchecker.ignored_words_file_path, 'at') as ignored_file:
                 ignored_file.write(word + '\n')
             self.highlight_unknown()
     
@@ -698,22 +702,49 @@ class SpellcheckerApp:
                     self.spellchecker.known_words.add(new_word)
                     self.text.tag_remove("highlight", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
                     self.text.tag_remove("selected", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
-                    with open(personal_dict, 'rt') as personal_dict_file:
-                        if new_word not in personal_dict:
-                            with open(personal_dict, 'at') as personal_dict_file:
+                    with open(self.spellchecker.personal_dict_file_path, 'rt') as personal_dict_file:
+                        if new_word not in personal_dict_file:
+                            with open(personal_dict_file_path, 'at') as personal_dict_file:
                                 personal_dict_file.write(new_word+'\n')
                     self.highlight_unknown()
 
 if __name__ == "__main__":
-    with open("example.txt", 'rt') as example_text_file:
-        text_content = example_text_file.read()
+    
+    default_folder = os.path.dirname(os.path.abspath(__file__))
+    default_words_file = os.path.join(default_folder, "words.txt")
+    default_ignored_file = os.path.join(default_folder, "ign_words.txt")
+    default_personal_dict_file = os.path.join(default_folder, "pers_dict.txt")
+    default_txt_example_file = os.path.join(default_folder, "example.txt")
 
-    reference_file = TextFile(text_content)
-    known_words_file = "words.txt"
-    ign_words_file = "ign_words.txt"
-    personal_dict = "pers_dict.txt"
+    parser = argparse.ArgumentParser(description="Start the Application")
+    parser.add_argument("--words", type=str, default=default_words_file, help="Path to known words file")
+    parser.add_argument("--ignored", type=str, default=default_ignored_file, help="Path to ignored words file")
+    parser.add_argument("--pd", type=str, default=default_personal_dict_file, help="Path to personal dictionary file")
+    parser.add_argument("--ex", type=str, default=default_txt_example_file, help="Path to example text file")
+    args = parser.parse_args()
+
+    def load_files(file_path):
+        if os.path.isfile(file_path):
+            with open(file_path, 'rt') as file:
+                return set(file.read().splitlines())
+        else:
+            print("File: '{}' not found".format(file_path))
+            return set()
+    
+    
+            
+
+    known_words_file_path = args.words
+    personal_dict_file_path = args.pd
+    ign_words_file_path = args.ignored
+
+    with open(args.ex, 'rt') as example_text_file:
+        example_text = example_text_file.read()
+
+    reference_file = TextFile(example_text)
     window = tk.Tk()
-    spellchecker = Spellchecker(reference_file,known_words_file, personal_dict)
+    spellchecker = Spellchecker(reference_file,known_words_file_path,personal_dict_file_path, ign_words_file_path)
+    spellchecker.ignored_words = load_files(ign_words_file_path)
     app = SpellcheckerApp(window, spellchecker)
     window.mainloop()
 #rest of globals
