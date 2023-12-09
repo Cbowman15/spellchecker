@@ -53,6 +53,32 @@ except ImportError as e:
 
 #Spellchecker class, basic spellchecking functionality
 class Spellchecker():
+    """
+    Initializes a Spellchecker object, which checks text against a file of known,
+    or correctly-spelled, words.
+    
+    Attributes:
+    -reference_file (ReferenceFile): the text to be checked for spelling-errors
+    -known_words (set): a set of strings, a reference for correctly-spelled words
+    -ignored_words_file_path (str): file path to a custom list of words to be ignored (when spellchecking)
+    -personal_dict_file (str): file path to a personal dictionary, contained words will be ignored (when spellchecking)
+    -ignored_words (set): a set of words to be ignored when spellchecking
+    -unknown_words (list): a list of words identified as misspelled
+    
+    Arguments:
+    -reference_file (str): text input/ path to the text to be checked
+    -known_words_file_path (str): path to file with correctly-spelled words
+    -personal_dict_file_path (str): path to file for personal dictionary
+    -ignored_words_file_path (str): path to file for words to ignore
+    
+    -Takes in all words from argument file paths
+    -Takes in ignored_words from a 'load_files' method
+    
+    Required:
+    -File paths must be assigned viable/real/accessible text files
+    -known_words_file_path and personal_dict_file_path are text files, containing
+     one word per line
+     """
     def __init__(self, reference_file, known_words_file_path, personal_dict_file_path, ignored_words_file_path):
         self.reference_file = reference_file
         self.known_words = self.get_known_words(known_words_file_path, personal_dict_file_path)
@@ -62,6 +88,23 @@ class Spellchecker():
         self.unknown_words = []
         
     def spell_check(self):
+        """
+        Parses the reference text and checks each individual word against known words and
+        the personal dictionary. It then identifies the unknown words and produces suggestions
+        for them.
+        
+        -Each word, after the use of a regex match, is checked against known words
+        -Words that are at the start of a sentence, regardless of punctuation are
+         identified as known. Words that are captialized are identified as known.
+        -Exceptions are accounted for
+        
+        Returns:
+        None
+        
+        Required:
+        -The reference file should be initialized with text to be parsed
+        -known_words should be populated with correctly-spelled words
+        """
         try:
             words_to_check = self.reference_file.parse()
         except Exception as e:
@@ -79,6 +122,22 @@ class Spellchecker():
                 
 
     def start_sentence(self, word_index, words_to_check):
+        """
+        Checks to see if a word is at the start of a sentence.
+
+        Arguments:
+        -word_index (int): index of the current word in the list of words to check
+        -words_to_check (list): list of words, parsed from reference text
+
+        Returns:
+        -bool: True, if word follows punctuation. Otherwise, False
+
+        -Exceptions are accounted for
+
+        Required:
+        -word_index is a non-negative integer, within bounds of words_to_check
+        -words_to_check is a list of strings, with each string a word from reference text
+        """
         if word_index == 0:
             return True
         try:
@@ -88,6 +147,24 @@ class Spellchecker():
             print("Error in start_sentence: {}".format(e))
 
     def get_known_words(self, known_words_file_path, personal_dict_file_path):
+        """
+        Reads known words from known words file and personal dictionary file, combining
+        them and returning them as a set.
+        
+        Arguments:
+        -known_words_file_path (str): path to file of correctly-spelled words
+        -personal_dict_file_path (str): path to file of personal dictionary
+        
+        Returns:
+        -set: set of known words, taken from known words file and personal dictionary file
+        
+        -Exceptions accounted for
+        
+        Required:
+        -Both arguments are strings for a viable/accessible file path
+        -Files of known_words_file_path and personal_dict_file_path must be accessible
+         and have one word per line
+         """
         known_words = set()
         try:
             if os.path.isfile(known_words_file_path):
@@ -102,21 +179,77 @@ class Spellchecker():
 
 #abstract class for subclass parsing
 class ReferenceFile():
+    """
+    Abstract class for different file types, for text extraction.
+    
+    Attributes:
+    -text (str): plain-text content of file
+    
+    Methods:
+    -parse: abstract method, is intended to be overridden by subclasses
+    """
     def __init__(self, text):
+        """
+        Initializes ReferenceFile object with provided text.
+        
+        Arguments:
+        -text (str): plain-text content of file
+        """
         self.text = text
     def parse(self):
         pass
 
 #class for suggestions
 class Suggester():
+    """
+    Checks whether given word is in known words, and if not, produces suggestions for
+    similarly spelled words, based on Levenshtein distance.
+    
+    (Levenshtein distance is a measure of single-character edits to transform one word
+     into another)
+    
+    Attributes:
+    -known_words (set): a set of correctly-spelled words
+    
+    Methods:
+    -get_suggestions(word, known_words): static method, returning list of suggestions
+    -checker(word): checks if word is in known_words
+    """
     @staticmethod
     def get_suggestions(word, known_words):
+        """
+        Provides suggestions for given word, from known words, based on Levenshtein
+        distance.
+        
+        Arguments:
+        -word (str): word to produce suggestions for
+        -known_words (iterable): iterable containing known words
+        
+        Returns:
+        -list: list of supposed top three suggestions
+        """
         suggestions = sorted(known_words, key=lambda known_word:Levenshtein.distance(word, known_word))
         return suggestions[:3]
     
     def __init__(self, known_words=None):
+        """
+        Initializes Suggester with set of known words.
+        
+        Arguments:
+        -known_words (iterable): optional iterable of known words; else, defaults
+         to empty set
+         """
         self.known_words = known_words or set()
     def checker(self, word):
+        """
+        Checks if word is in known words set.
+        
+        Arguments:
+        -word (str): word to check against known words
+        
+        Returns:
+        -bool: True if word in set of known words, else False
+        """
         if word in self.known_words:
             return True
         else:
@@ -124,9 +257,26 @@ class Suggester():
 
 #subclass parsing
 class TextFile(ReferenceFile):
+    """
+    A subclass of ReferenceFile, specifically for the handling of .txt files
+    
+    Arguments:
+    text (str): contents of text file
+    
+    -Parse method is overridden, as regex was used
+    """
     def __init__(self, text):
+        """
+        Initializes parent class with text.
+        """
         super().__init__(text)
     def parse(self):
+        """
+        Parses file contents into list of words, splitting at whitespace.
+
+        Returns:
+        -list: list of strings, which are parsed words from file
+        """
         return re.split(r'\s', self.text.strip())
 
 #subclass parsing
@@ -159,6 +309,15 @@ class DocxFile(ReferenceFile):
 
 #'the' GUI
 class SpellcheckerApp:
+    """
+    'The' GUI
+    
+    Attributes:
+    window (tk.Tk): main application window
+    
+    Arguments:
+    window (tk.Tk): Tkinter window
+    spellchecker (Spellchecker): initialized Spellchecker object"""
     def __init__(self, window, spellchecker):
         self.window = window
         self.window.title("Spellchecker EECE2140")
