@@ -107,9 +107,11 @@ class SpellcheckerApp:
         with open("example.txt", 'rt') as example_text_file:
             text_content = example_text_file.read()
 
-        self.sug_listbox = tk.Listbox(self.frm, width=40,height=3)
+        self.sug_listbox = tk.Listbox(self.frm, width=40,height=3, takefocus=False)
         self.sug_listbox.pack(side=tk.BOTTOM)
-        self.sug_listbox.bind("<<ListboxSelect>>", self.chosen_listbox)    
+        self.sug_listbox.bind("<Button-1>", self.focus_text)
+        self.sug_listbox.bind("<Button-2>", self.focus_text)   
+        self.sug_listbox.bind("<Button-3>", self.focus_text)   
         self.text.insert(tk.END, text_content)
         self.lang_entry = tk.Entry(self.frm)
         self.initial = True
@@ -138,6 +140,7 @@ class SpellcheckerApp:
         self.btn_redo["takefocus"] = False
         self.btn_translate["takefocus"] = False
         self.btn_close_trans["takefocus"] = False
+        self.sug_listbox["takefocus"] = False
         self.text.config(undo=False)
         self.spellchecker = spellchecker
         self.unknown_words = spellchecker.unknown_words
@@ -195,14 +198,19 @@ class SpellcheckerApp:
         self.working_file = None
         self.translator = Translator()
 
+    def focus_text(self, event):
+        self.text.focus_set()
+
     def refresh(self, event=None):
         start_index = self.text.index("sel.first")
         end_index = self.text.index("sel.last")
         selected = self.text.get(start_index, end_index)
         self.spellchecker.reference_file.text = selected
         self.spellchecker.spell_check()
-        self.add_listbox()
         self.highlight_unknown()
+        self.add_listbox()
+        self.add_dict
+
 
     def open_file_one(self, file_to_open):
         self.working_file = file_to_open
@@ -221,8 +229,11 @@ class SpellcheckerApp:
             document = Document(file_to_open)
             text_content = '\n'.join(paragraph.text for paragraph in document.paragraphs if paragraph.text)
             self.spellchecker.reference_file = DocxFile(text_content)
+        else:
+            return
         self.update_window(text_content)
         self.title(os.path.basename(file_to_open))
+        #self.refresh()--if wanted auto, ruins efficiency, though
     
     def update_window(self, text_content):
         if text_content:
@@ -394,13 +405,17 @@ class SpellcheckerApp:
         self.text.focus_set()
         self.text.mark_set(tk.INSERT, start_index)
         self.next_unknown()
+        self.add_listbox()
 
     def add_listbox(self):
         self.sug_listbox.delete(0, tk.END)
         if self.current_unknown_index<(len(self.unknown_words)):
-            (curr_word, suggestions) = self.unknown_words[self.current_unknown_index]
-        for suggestion in suggestions:
-            self.sug_listbox.insert(tk.END, suggestion)
+            unknown = self.unknown_words[self.current_unknown_index]
+            if isinstance(unknown, tuple) and len(unknown) == 2:
+                (curr_word, suggestions) = unknown
+                for suggestion in suggestions:
+                    self.sug_listbox.insert(tk.END, suggestion)
+            
 
     def save_undo(self):
         text = self.text.get("1.0", tk.END)
@@ -511,7 +526,7 @@ class SpellcheckerApp:
             self.text.tag_add("selected", start_index, end_index)
             self.text.tag_config("selected", background="blue")
             self.text.tag_config("highlight", background="yellow")
-        self.add_listbox()
+            
             
     def previous_unknown(self):
         if self.highlight_indexes:
@@ -529,10 +544,11 @@ class SpellcheckerApp:
         self.add_listbox()
         
     
-    def set_insertion(self, pos):
-        if not self.arrow_key_mode:
-            self.text.mark_set(tk.INSERT, pos)
-            self.text.see(tk.INSERT)
+    def set_insertion(self, pos, event=None):
+        if self.arrow_key_mode:
+            pos = pos+"+1c"
+        self.text.mark_set(tk.INSERT, pos)
+        self.text.see(pos)
 
     def highlight_unknown(self):
         curr_time = time.time()
@@ -632,7 +648,7 @@ class SpellcheckerApp:
         if self.curr_word_pos:
             word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
             if word:
-                suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words)
+                suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words) if word else []
                 self.suggestion_menu(word, suggestions)
     
     def suggestion_menu(self, unknown_word, suggestions):
@@ -640,9 +656,11 @@ class SpellcheckerApp:
         if suggestions:
             for suggestion in suggestions:
                 self.menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
-            x = self.text.winfo_pointerx()
-            y = self.text.winfo_pointery()
-            self.menu.tk_popup(x,y) #will need to check on this--not sure about it
+        else:
+            self.menu.add_command(label="undetermined", command=tk.NONE)
+        x = self.text.winfo_pointerx()
+        y = self.text.winfo_pointery()
+        self.menu.tk_popup(x,y) #will need to check on this--not sure about it
         
 
     def get_a_suggestion(self, unknown_word, suggestion):
