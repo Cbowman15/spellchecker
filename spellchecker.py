@@ -149,7 +149,7 @@ class SpellcheckerApp:
         self.spellchecker = spellchecker
         self.unknown_words = spellchecker.unknown_words
         self.text.tag_config("highlight", background="yellow")
-        self.text.tag_config("selected", background="blue")
+        self.text.tag_config("selected", background="CadetBlue1")
         self.text.tag_bind("highlight", "<Button-3>", self.show_menu)
         self.text.bind("<KeyPress>", self.keypress_action)
         self.text.bind("<KeyRelease>", self.keyrelease_action)
@@ -472,7 +472,7 @@ class SpellcheckerApp:
             self.curr_word_pos = curr_index
             self.text.tag_remove("selected", "1.0", tk.END)
             self.text.tag_add("selected", curr_index + " wordstart", curr_index + " wordend")
-            self.text.tag_config("selected", background="blue")
+            self.text.tag_config("selected", background="CadetBlue1")
             menu = tk.Menu(self.text, tearoff=1)
             menu.add_command(label="Ignore", command=self.ignore_unknown)
             menu.add_command(label="Get Suggestion", command=self.accept_suggestion)
@@ -527,7 +527,7 @@ class SpellcheckerApp:
             self.text.tag_config("highlight", background="yellow")
             self.initial = False
         else:
-            self.text.tag_config("selected", background="blue")
+            self.text.tag_config("selected", background="CadetBlue1")
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
@@ -539,7 +539,7 @@ class SpellcheckerApp:
                 if index != self.current_unknown_index:
                     self.text.tag_add("highlight", start, end)
             self.text.tag_add("selected", start_index, end_index)
-            self.text.tag_config("selected", background="blue")
+            self.text.tag_config("selected", background="CadetBlue1")
             self.text.tag_config("highlight", background="yellow")
             
             
@@ -555,7 +555,7 @@ class SpellcheckerApp:
                 if index != self.current_unknown_index:
                     self.text.tag_add("highlight", start, end)
             self.text.tag_add("selected", start_index, end_index)
-            self.text.tag_config("selected", background="blue")
+            self.text.tag_config("selected", background="CadetBlue1")
             self.text.tag_config("highlight", background="yellow")
         self.add_listbox()
         
