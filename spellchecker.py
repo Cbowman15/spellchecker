@@ -530,6 +530,24 @@ class SpellcheckerApp:
 
 #file opening, on separate thread from rest
     def refresh(self, event=None):
+        """
+        Refreshes the spellchecking, highlighting, and suggestion display
+        for the application. Optionally, can make application real-time spellchecker,
+        however, it excessively slows program down. It is applicable, currently, 
+        to only system-highlighted text.
+
+        Arguments:
+        -event (Event, optional): a given event that triggers the function.
+         Defaulted to None.
+
+        Required:
+        -A correct Tkinter text widget to be initialized as self.text
+
+        Returns:
+        -Nothing
+
+        -If no text is selected, currently, nothing happens        
+        """
         curr_index = self.text.index(tk.INSERT)
         start_index = self.text.index("sel.first")
         end_index = self.text.index("sel.last")
@@ -542,6 +560,24 @@ class SpellcheckerApp:
         self.text.see(curr_index)
 
     def open_file_one(self, file_to_open):
+        """
+        Opens a given file, updates reference file type for parsing and extraction.
+        
+        Required:
+        -file_to_open must be a string, with a supported file type
+        
+        Arguments:
+        -fill_to_open: a string of file path to be opened and read
+        
+        Read:
+        -Nothing
+        
+        -If file ends with .txt, read as plain text
+        -If file ends with .html or .htm, read as HTML
+        -If file ends with .pdf, read as PDF
+        -If file ends with .docx, read as .docx file (read, lines joined)
+        -If file ends with something else, error message printed
+        """
         try:
             self.working_file = file_to_open
             if file_to_open.lower().endswith('.txt'):
@@ -569,22 +605,75 @@ class SpellcheckerApp:
         #self.refresh()--if wanted auto, ruins efficiency, though
     
     def update_window(self, text_content):
+        """
+        Updates window text area. It clears existing text, inserting the new
+        file content, and updates the spellchecker's reference file text.
+        
+        Arguments:
+        -text_content (str): text content to be inserted into window text widget
+        
+        Required:
+        -text_content must be a string, which is the content of a given file
+
+        Returns:
+        -Nothing
+        """
         if text_content:
             self.window.after(0, self.text.delete, "1.0", tk.END)
             self.window.after(0, self.text.insert, tk.END, text_content)
             self.spellchecker.reference_file.text = text_content
 
     def open_file_two(self, event=None):
+        """
+        Opens the file dialog for the user to select a file. Opens the file
+        on a separate thread, for efficiency.
+        
+        Arguments:
+        -event (Event, optional): event that triggers the method. Defaulted
+         to None.
+         
+        Required:
+        -filedialog module must be imported successfully
+        -threading module must be imported successfully
+         
+        Returns:
+        -str: returns string "break" to stop event from triggering other methods
+
+        -Shows user file dialog, without exiting the program
+        """
         file_to_open = filedialog.askopenfilename()
         if file_to_open:
             threading.Thread(target=self.open_file_one, args=(file_to_open,), daemon=True).start()
         return "break"
     
     def title(self, title):
+        """
+        Sets the title of the window with a string.
+        
+        Arguments:
+        -title (str): new title for window
+        
+        Returns:
+        -Nothing
+        """
         self.window.title("{}".format(title))
 
 #other options for handling file
     def save_file(self, event=None):
+        """
+        Saves current text, in self.working_file, to system. Updates title
+        of the window after successfully saving.
+
+        Arguments:
+        -event (Event, optional): event that triggers the save feature.
+         Defaulted to None.
+        
+        Returns:
+        -None
+        
+        -If not already saved into system, it calls self.save_as.
+        -If already saved into system, it overwrites the former state of text.
+        """
         try:
             if self.working_file:
                 with open(self.working_file, 'wt') as save_file:
@@ -597,6 +686,18 @@ class SpellcheckerApp:
             print("Error in save_file: {}".format(e))
 
     def save_as(self, event=None):
+        """
+        Prompts user to select file path for saving current state of text in
+        window. Makes use of file dialog, with file format not defaulted.
+        After successful save, window name is updated.
+        
+        Arguments:
+        -event (Event, optional): event that triggers save-as feature.
+         Defaulted to None.
+         
+        Returns:
+        -None
+        """
         try:
             save_file = filedialog.asksaveasfilename(filetypes=[("All Files", "*.*")])
             if save_file:
@@ -610,6 +711,19 @@ class SpellcheckerApp:
 
 #arrow keys mode functionality
     def on_arrow_mode(self, event):
+        """
+        Uses keyboard event to toggle on arrow mode. Checks whether mode is
+        currently active, before moving forward. If off, will work. Dependent on
+        number of times arrow key (up) is pressed. Upon reaching threshold (x3),
+        arrow mode is activated. Afterward, the count is reset. Disables/forgets
+        NEXT, PREVIOUS, UNDO, and REDO buttons. Activates +DICTIONARY button.
+        
+        Arguments:
+        -event (Event): event containing information about key presses
+        
+        Returns:
+        -None
+        """
         try:    
             if not self.arrow_key_mode and (event.state & 0x1):
                 self.arrow_key_count += 1
@@ -624,6 +738,19 @@ class SpellcheckerApp:
             print("Error in on_arrow_mode: {}".format(e))
     
     def off_arrow_mode(self, event):
+        """
+        Uses keyboard event to toggle off arrow mode. Checks whether mode is
+        currently active, before moving forward. If on, will work. Dependent on
+        number of times arrow key (down) is pressed. Upon reaching threshold (x3),
+        arrow mode is deactivated. Afterward, the count is reset. Activates
+        NEXT, PREVIOUS, UNDO, and REDO buttons. Deactivates/forgets +DICTIONARY button.
+        
+        Arguments:
+        -event (Event): event containing information about key presses
+        
+        Returns:
+        -None
+        """
         try:
             if self.arrow_key_mode and (event.state & 0x1):
                 self.arrow_key_count += 1
@@ -640,6 +767,19 @@ class SpellcheckerApp:
             print("Error in off_arrow_mode: {}".format(e))
     
     def arrow_key_move(self, event):
+        """
+        Handles arrow key movement (left/right), when arrow mode is activated.
+        When the left arrow is pressed, self.previous_unknown() is triggered.
+        When the right arrow is pressed, self.next_unknown() is triggered. It
+        allows for the navigation between unknown words, highlighting the current
+        word a different color from the rest.
+        
+        Arguments:
+        -event (Event): event which includes key press event information
+        
+        Returns:
+        -None
+        """
         try:
             if self.arrow_key_mode:
                 if event.keysym == "Left":
@@ -650,6 +790,16 @@ class SpellcheckerApp:
             print("Error in arrow_key_move: {}".format(e))
     
     def hide_btns(self):
+        """
+        Hides the NEXT, PREVIOUS, UNDO, and REDO buttons when triggered.
+        Is initially disabled, but is enabled when arrow mode is activated.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.btn_next_unknown.pack_forget()
             self.btn_prev_unknown.pack_forget()
@@ -659,6 +809,16 @@ class SpellcheckerApp:
             print("Error in hide_btns: {}".format(e))
     
     def show_btns(self):
+        """
+        Displays the NEXT, PREVIOUS, UNDO, and REDO buttons when activated.
+        Initially enabled upon start. Disabled upon the activation of arrow mode.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.btn_next_unknown.pack(side=self.btn_next_anchor, padx=3, pady=3, anchor=tk.SE)
             self.btn_prev_unknown.pack(side=self.btn_prev_anchor, padx=3, pady=3, anchor=tk.SW)
@@ -669,19 +829,61 @@ class SpellcheckerApp:
 
 #focusing for GUI, friendlier experience
     def focus_text(self, event):
+        """
+        Sets focus in the application to the text widget.
+        
+        Arguments:
+        -event (Event): event that triggers method. 
+        
+        Returns:
+        -None
+        """
         self.text.focus_set()
     
     def set_insertion(self, pos, event=None):
+        """
+        Adjusts the position of the insertion point in the text if arrow
+        mode is currently active. It moves the point one character forward.
+        
+        Arguments:
+        -pos (str): new position index for insertion point in text
+        -event (Event, optional): event that triggers this method. Defaulted
+         to None.
+        
+        Returns:
+        -None
+        """
         if self.arrow_key_mode:
             pos = pos+"+1c"
         self.text.mark_set(tk.INSERT, pos)
         self.text.see(pos)
 
     def focus_out(self, event=None):
+        """
+        Remembers selection range of text, given that focus is lost from the text
+        
+        Arguments:
+        -event (Event, optional): event that triggered focus-out action. Defaulted
+         to None
+        
+        Returns:
+        -None
+        """
         if self.text.tag_ranges('sel'):
             self.last_select = (self.text.index("sel.first"), self.text.index("sel.last"))
 
     def focus_in(self, event=None):
+        """
+        Restores selection range of text, when focus is regained to text. Works
+        in parallel with the focus_out function.
+        
+        Arguments:
+        -event (Event, optional): event that triggered focus-in action. Defaulted
+         to None.
+        
+        Returns:
+        -None
+        """
         if self.last_select:
             self.text.tag_add("sel", self.last_select[0], self.last_select[1])
             self.text.mark_set("insert", self.last_select[0])
@@ -689,6 +891,16 @@ class SpellcheckerApp:
             self.last_select = None
 
     def processing_event(self):
+        """
+        Gets current word at the cursor for suggestions. Fixed some bug
+        in other functions.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         curr_index = self.text.index(tk.INSERT)
         curr_word = self.get_curr_word(curr_index)
         if curr_word:
@@ -698,6 +910,21 @@ class SpellcheckerApp:
             self.timer_delay = None
 
     def overload_shift(self, event):
+        """
+        Handles events that involve pressing the Shift key, disabling normal
+        system shortcuts. Arrow mode is activated through the pressing of
+        the 'up' arrow (x3), while holding the Shift key. Arrow mode is 
+        deactivated through the pressing of the 'down' arrow (x3), while
+        holding the Shift key.
+        
+        Arguments:
+        -event (Event, optional): Tkinter event object gets information of
+         key press event.
+        
+        Returns:
+        -"break" (str): preventing the trigger of other functions with given
+         keyboard event.
+         """
         if event.keysym == "Up" and (event.state & 0x1):
             self.on_arrow_mode(event)
             return "break"
@@ -708,6 +935,16 @@ class SpellcheckerApp:
             return "break"
         
     def keypress_action(self, event):
+        """
+        Allows for a more custom undo feature, saving individual histories up
+        until certain punctuation, in addition to discrete changes in the text.
+
+        Arguments:
+        -event (Event): Tkinter event object, captures keypress event
+
+        Returns:
+        -None
+        """
         if event.char.isalpha():
             if self.timer_delay:
                 self.window.after_cancel(self.timer_delay)
@@ -716,24 +953,69 @@ class SpellcheckerApp:
             self.save_undo()
         
     def keyrelease_action(self, event):
+        """
+        When user stops typing, the current state of the text is saved. Works
+        in parallel with the keypress_action function. Additionally, uses a timer
+        to automatically save current text state into the undo feature.
+        
+        Arguments:
+        -event (Event, optional): Tkinter event object that passes information into
+         the binding system for key releases.
+         
+        Returns:
+        -None
+        """
         if self.timer_delay:
             self.window.after_cancel(self.timer_delay)
         self.timer_delay = self.window.after(self.time_delay, self.processing_event)
 
 #bottom menu buttons, click-menu options
     def undo(self):
+        """
+        Performs an undo action. Reverts the current state of text, back to
+        a previous point in the history list.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.new_undo()
         except Exception as e:
             print("Error during undo process: {}".format(e))
     
     def redo(self):
+        """
+        Performs a redo action. Reverts the current state of text, back to
+        a previous point in the history list (given that the undo function
+        was run).
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.new_redo()
         except Exception as e:
             print("Error during redo process: {}".format(e))
 
     def save_undo(self):
+        """
+        Saves the current state of text, with the cursor position, for use 
+        in the undo function.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+
+        -Appends new states into the undo_hist function
+        """
         try:
             text = self.text.get("1.0", tk.END)
             cursor_pos = self.text.index(tk.INSERT)
