@@ -12,6 +12,7 @@ from fuzzywuzzy import process
 from googletrans import Translator, LANGUAGES
 import argparse
 
+#Spellchecker class, basic spellchecking functionality
 class Spellchecker():
     def __init__(self, reference_file, known_words_file_path, personal_dict_file_path, ignored_words_file_path):
         self.reference_file = reference_file
@@ -22,7 +23,7 @@ class Spellchecker():
         self.unknown_words = []
         
     def spell_check(self):
-        words_to_check = self.reference_file.parse() #check this phrase
+        words_to_check = self.reference_file.parse()
         for index, word in enumerate(words_to_check):
             if re.match(r"^[a-zA-Z'-]+$", word):
                 known = (word.lower() in self.known_words) or (word in self.known_words)
@@ -48,15 +49,17 @@ class Spellchecker():
                 known_words.update(personal_dict_file.read().split())
         return known_words
 
+#abstract class for subclass parsing
 class ReferenceFile():
     def __init__(self, text):
         self.text = text
     def parse(self):
-        pass #research implies is good to use, may be redundant (check later)
+        pass
 
+#class for suggestions
 class Suggester():
     @staticmethod
-    def get_suggestions(word, known_words): #work on this NEXT!
+    def get_suggestions(word, known_words):
         suggestions = sorted(known_words, key=lambda known_word:Levenshtein.distance(word, known_word))
         return suggestions[:3]
     
@@ -68,20 +71,23 @@ class Suggester():
         else:
             return False
 
+#subclass parsing
 class TextFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
         return re.split(r'\s', self.text.strip())
 
-class HTMLFile(ReferenceFile): #depending on how I want command line, may
-    def __init__(self, text):  #have to use a 'with open'
+#subclass parsing
+class HTMLFile(ReferenceFile):
+    def __init__(self, text):
         super().__init__(text)
     def parse(self):
-        soup = BeautifulSoup(self.text, "lxml") #may have done wrong, importing
+        soup = BeautifulSoup(self.text, "lxml")
         html_content = soup.get_text()
         return html_content.split()
 
+#subclass parsing
 class PDFFile(ReferenceFile):
     def __init__(self, file_path):
         super().__init__(None)
@@ -93,12 +99,14 @@ class PDFFile(ReferenceFile):
                 content += page.get_text()
         return content
 
+#subclass parsing
 class DocxFile(ReferenceFile):
     def __init__(self, text):
         super().__init__(text)
     def parse(self):
         return self.text.split()
 
+#'the' GUI
 class SpellcheckerApp:
     def __init__(self, window, spellchecker):
         self.window = window
@@ -202,9 +210,7 @@ class SpellcheckerApp:
         self.working_file = None
         self.translator = Translator()
 
-    def focus_text(self, event):
-        self.text.focus_set()
-
+#file opening, on separate thread from rest
     def refresh(self, event=None):
         curr_index = self.text.index(tk.INSERT)
         start_index = self.text.index("sel.first")
@@ -216,7 +222,6 @@ class SpellcheckerApp:
         self.add_listbox()
         self.add_dict
         self.text.see(curr_index)
-
 
     def open_file_one(self, file_to_open):
         self.working_file = file_to_open
@@ -247,7 +252,6 @@ class SpellcheckerApp:
             self.window.after(0, self.text.insert, tk.END, text_content)
             self.spellchecker.reference_file.text = text_content
 
-
     def open_file_two(self, event=None):
         file_to_open = filedialog.askopenfilename()
         if file_to_open:
@@ -257,6 +261,7 @@ class SpellcheckerApp:
     def title(self, title):
         self.window.title("{}".format(title))
 
+#other options for handling file
     def save_file(self, event=None):
         if self.working_file:
             with open(self.working_file, 'wt') as save_file:
@@ -274,6 +279,8 @@ class SpellcheckerApp:
                 save_as_file.write(saving_text.rstrip())
                 self.working_file = save_file
                 self.title(os.path.basename(save_file))
+
+#arrow keys mode functionality
     def on_arrow_mode(self, event):
         if not self.arrow_key_mode and (event.state & 0x1):
             self.arrow_key_count += 1
@@ -298,6 +305,15 @@ class SpellcheckerApp:
                 self.show_btns()
                 self.dict_off()
     
+    def arrow_key_move(self, event):
+        if self.arrow_key_mode:
+            if event.keysym == "Left":
+                self.previous_unknown()
+            elif event.keysym == "Right":
+                self.next_unknown()
+            else:
+                pass
+    
     def hide_btns(self):
         self.btn_next_unknown.pack_forget()
         self.btn_prev_unknown.pack_forget()
@@ -310,16 +326,16 @@ class SpellcheckerApp:
         self.btn_undo.pack(side=self.btn_undo_anchor, padx=3, pady=3, anchor=tk.SW)
         self.btn_redo.pack(side=self.btn_redo_anchor, padx=3, pady=3, anchor=tk.SE)
 
-
-    def arrow_key_move(self, event):
-        if self.arrow_key_mode:
-            if event.keysym == "Left":
-                self.previous_unknown()
-            elif event.keysym == "Right":
-                self.next_unknown()
-            else:
-                pass
+#focusing for GUI, friendlier experience
+    def focus_text(self, event):
+        self.text.focus_set()
     
+    def set_insertion(self, pos, event=None):
+        if self.arrow_key_mode:
+            pos = pos+"+1c"
+        self.text.mark_set(tk.INSERT, pos)
+        self.text.see(pos)
+
     def focus_out(self, event=None):
         if self.text.tag_ranges('sel'):
             self.last_select = (self.text.index("sel.first"), self.text.index("sel.last"))
@@ -331,6 +347,15 @@ class SpellcheckerApp:
             self.text.see("insert")
             self.last_select = None
 
+    def processing_event(self):
+        curr_index = self.text.index(tk.INSERT)
+        curr_word = self.get_curr_word(curr_index)
+        if curr_word:
+            suggestions = Suggester.get_suggestions(curr_word, self.spellchecker.known_words)
+        if self.timer_delay:
+            self.window.after_cancel(self.timer_delay)
+            self.timer_delay = None
+
     def overload_shift(self, event):
         if event.keysym == "Up" and (event.state & 0x1):
             self.on_arrow_mode(event)
@@ -341,13 +366,6 @@ class SpellcheckerApp:
         else:
             return "break"
         
-    def undo(self):
-        self.new_undo()
-    
-    def redo(self):
-        self.new_redo()
-        
-
     def keypress_action(self, event):
         if event.char.isalpha():
             if self.timer_delay:
@@ -360,16 +378,39 @@ class SpellcheckerApp:
         if self.timer_delay:
             self.window.after_cancel(self.timer_delay)
         self.timer_delay = self.window.after(self.time_delay, self.processing_event)
+
+#bottom menu buttons, click-menu options
+    def undo(self):
+        self.new_undo()
     
-    def processing_event(self):
-        curr_index = self.text.index(tk.INSERT)
-        curr_word = self.get_curr_word(curr_index)
-        if curr_word:
-            suggestions = Suggester.get_suggestions(curr_word, self.spellchecker.known_words)
-        if self.timer_delay:
-            self.window.after_cancel(self.timer_delay)
-            self.timer_delay = None
+    def redo(self):
+        self.new_redo()
+
+    def save_undo(self):
+        text = self.text.get("1.0", tk.END)
+        cursor_pos = self.text.index(tk.INSERT)
+        self.undo_hist.append((text, cursor_pos))
     
+    def new_undo(self, event=None):
+        if self.undo_hist:
+            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
+            self.redo_hist.append(current)
+            prev = self.undo_hist.pop()
+            self.text.delete("1.0", tk.END)
+            self.text.insert("1.0", prev[0])
+            self.text.mark_set(tk.INSERT, prev[1])
+        return "break"
+    
+    def new_redo(self, event=None):
+        if self.redo_hist:
+            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
+            self.undo_hist.append(current)
+            new = self.redo_hist.pop()
+            self.text.delete("1.0", tk.END)
+            self.text.insert("1.0", new[0])
+            self.text.mark_set(tk.INSERT, new[1])
+        return "break"
+
     def dict_off(self):
         self.btn_dict.pack_forget()
         self.sug_listbox.pack_forget()
@@ -377,11 +418,6 @@ class SpellcheckerApp:
     def dict_on(self):
         self.btn_dict.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
         self.sug_listbox.pack(side=tk.BOTTOM, padx=3,pady=3)
-    
-    def get_cur_unknown(self):
-        if not self.unknown_words or (self.current_unknown_index>=len(self.unknown_words)):
-            return None
-        return self.unknown_words[self.current_unknown_index][0]
     
     def add_dict(self):
         curr_view = self.text.yview()
@@ -401,7 +437,96 @@ class SpellcheckerApp:
         self.text.yview_moveto(curr_view[0])
         self.text.mark_set(tk.INSERT, curr_index)
         self.text.see(curr_index)
+
+    def ignore_unknown(self):
+        if not self.highlight_indexes:
+            return
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
+        curr_word_start = curr_index + " wordstart"
+        curr_word_end = curr_index + " wordend"
+        word = self.text.get(curr_word_start, curr_word_end)
+        if word in self.unknown_words:
+            self.unknown_words.remove(word)
+            self.spellchecker.ignored_words.add(word)
+            self.text.tag_remove("highlight", curr_word_start, curr_word_end)
+            self.text.tag_remove("selected", curr_word_start, curr_word_end)
+            self.highlight_unknown()
+            with open(self.spellchecker.ignored_words_file_path, 'at') as ignored_file:
+                ignored_file.write(word + '\n')
+            self.highlight_unknown()
+            self.text.yview_moveto(curr_view[0])
     
+    def ignore_all(self, event=None):
+        curr_word = self.get_curr_word(self.text.index(tk.INSERT))
+        if not curr_word:
+            return
+        self.spellchecker.ignored_words.add(curr_word)
+        updated_words = []
+        for word in self.unknown_words:
+            if word[0] != curr_word:
+                updated_words.append(word)
+        self.unknown_words = updated_words
+        self.text.tag_remove("highlight", "1.0", tk.END)
+        self.text.tag_remove("selected", "1.0", tk.END)
+        updated_hlight = []
+        for (start_index, end_index) in self.highlight_indexes:
+            if self.text.get(start_index, end_index) != curr_word:
+                updated_hlight.append((start_index, end_index))
+        self.highlight_indexes = updated_hlight
+        self.highlight_unknown()
+        with open("ign_words.txt", 'at') as ignored_file:
+            ignored_file.write(curr_word+'\n')
+
+    def get_a_suggestion(self, unknown_word, suggestion):
+        return lambda: self.replace_unknown(unknown_word, suggestion)
+
+    def accept_suggestion(self):
+        if self.curr_word_pos:
+            word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
+            if word:
+                suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words) if word else []
+                self.suggestion_menu(word, suggestions)
+
+    def replace_unknown(self, unknown_word, suggestion):
+        curr_view = self.text.yview()
+        curr_index = self.text.index(tk.INSERT)
+        start_index = self.text.search(unknown_word, "1.0", tk.END)
+        while start_index:
+            end_index = self.text.index("{}+{}c".format(start_index, len(unknown_word)))
+            curr_word = self.text.get(start_index, end_index)
+            if curr_word == unknown_word and self.text.tag_ranges("selected"):
+                start_word = self.text.index("selected.first")
+                end_word = self.text.index("selected.last")
+                if start_index == start_word and end_index == end_word:
+                    self.text.delete(start_index, end_index)
+                    self.text.insert(start_index, suggestion)
+                    self.update_known(unknown_word, suggestion)
+                    self.curr_word_pos = None
+                    break
+            start_index = self.text.search(unknown_word, end_index, tk.END)
+        self.text.yview_moveto(curr_view[0])
+        self.text.mark_set(tk.INSERT, curr_index)
+        self.text.see(curr_index)
+
+    def update_known(self, prev, new):
+        if prev in self.unknown_words:
+            self.unknown_words.remove(prev)
+        self.spellchecker.ignored_words.discard(prev)
+        self.spellchecker.known_words.add(new)
+        self.highlight_unknown()
+
+    def suggestion_menu(self, unknown_word, suggestions):
+        self.menu.delete(0, tk.END)
+        if suggestions:
+            for suggestion in suggestions:
+                self.menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
+        else:
+            self.menu.add_command(label="undetermined", command=tk.NONE)
+        x = self.text.winfo_pointerx()
+        y = self.text.winfo_pointery()
+        self.menu.tk_popup(x,y)
+
     def chosen_listbox(self, event):
         curr_view = self.text.yview()
         curr_index = self.text.index(tk.INSERT)
@@ -429,39 +554,6 @@ class SpellcheckerApp:
                 (curr_word, suggestions) = unknown
                 for suggestion in suggestions:
                     self.sug_listbox.insert(tk.END, suggestion)
-            
-
-    def save_undo(self):
-        text = self.text.get("1.0", tk.END)
-        cursor_pos = self.text.index(tk.INSERT)
-        self.undo_hist.append((text, cursor_pos))
-    
-    def new_undo(self, event=None):
-        if self.undo_hist:
-            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
-            self.redo_hist.append(current)
-            prev = self.undo_hist.pop()
-            self.text.delete("1.0", tk.END)
-            self.text.insert("1.0", prev[0])
-            self.text.mark_set(tk.INSERT, prev[1])
-        return "break"
-    
-    def new_redo(self, event=None):
-        if self.redo_hist:
-            current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
-            self.undo_hist.append(current)
-            new = self.redo_hist.pop()
-            self.text.delete("1.0", tk.END)
-            self.text.insert("1.0", new[0])
-            self.text.mark_set(tk.INSERT, new[1])
-        return "break"
-    
-    def get_curr_word(self, curr_index):
-        start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
-        end_word = self.text.search(r'\M', curr_index, regexp=True)
-        if start_word and end_word:
-            return self.text.get(start_word, end_word)
-        return None
 
     def show_menu(self, event):
         curr_index = self.text.index(tk.CURRENT)
@@ -521,6 +613,18 @@ class SpellcheckerApp:
         self.btn_translate.pack_forget()
         self.translate_mode=False
 
+#word handling for highlighting, etc.
+    def get_curr_word(self, curr_index):
+        start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
+        end_word = self.text.search(r'\M', curr_index, regexp=True)
+        if start_word and end_word:
+            return self.text.get(start_word, end_word)
+        return None
+
+    def get_cur_unknown(self):
+        if not self.unknown_words or (self.current_unknown_index>=len(self.unknown_words)):
+            return None
+        return self.unknown_words[self.current_unknown_index][0]
 
     def next_unknown(self):
         if self.highlight_indexes:
@@ -542,7 +646,6 @@ class SpellcheckerApp:
             self.text.tag_config("selected", background="CadetBlue1")
             self.text.tag_config("highlight", background="yellow")
             
-            
     def previous_unknown(self):
         if self.highlight_indexes:
             self.text.tag_remove("selected", "1.0", tk.END)
@@ -558,13 +661,16 @@ class SpellcheckerApp:
             self.text.tag_config("selected", background="CadetBlue1")
             self.text.tag_config("highlight", background="yellow")
         self.add_listbox()
-        
-    
-    def set_insertion(self, pos, event=None):
-        if self.arrow_key_mode:
-            pos = pos+"+1c"
-        self.text.mark_set(tk.INSERT, pos)
-        self.text.see(pos)
+
+    def hlight_word(self, word, line_start, now_known_indexes):
+        match = re.search(r'\b{}\b'.format(re.escape(word)), self.text.get(line_start, line_start+"lineend"))
+        if match:
+            start_pos = "{}+{}c".format(line_start, match.start())
+            end_pos = "{}+{}c".format(line_start, match.end())
+            self.text.tag_add("highlight", start_pos, end_pos)
+            now_known_indexes.append((start_pos, end_pos))
+            if (word.lower() not in self.unknown_words) and (word not in self.unknown_words):
+                self.unknown_words.append(word.lower())
 
     def highlight_unknown(self):
         curr_time = time.time()
@@ -602,57 +708,6 @@ class SpellcheckerApp:
                 self.set_insertion("1.0")
                 self.text.tag_bind("highlight", "<Button-1>", self.show_menu)
 
-
-    def hlight_word(self, word, line_start, now_known_indexes):
-        match = re.search(r'\b{}\b'.format(re.escape(word)), self.text.get(line_start, line_start+"lineend"))
-        if match:
-            start_pos = "{}+{}c".format(line_start, match.start())
-            end_pos = "{}+{}c".format(line_start, match.end())
-            self.text.tag_add("highlight", start_pos, end_pos)
-            now_known_indexes.append((start_pos, end_pos))
-            if (word.lower() not in self.unknown_words) and (word not in self.unknown_words):
-                self.unknown_words.append(word.lower())
-            
-    def ignore_unknown(self):
-        if not self.highlight_indexes:
-            return
-        curr_view = self.text.yview()
-        curr_index = self.text.index(tk.INSERT)
-        curr_word_start = curr_index + " wordstart"
-        curr_word_end = curr_index + " wordend"
-        word = self.text.get(curr_word_start, curr_word_end)
-        if word in self.unknown_words:
-            self.unknown_words.remove(word)
-            self.spellchecker.ignored_words.add(word)
-            self.text.tag_remove("highlight", curr_word_start, curr_word_end)
-            self.text.tag_remove("selected", curr_word_start, curr_word_end)
-            self.highlight_unknown()
-            with open(self.spellchecker.ignored_words_file_path, 'at') as ignored_file:
-                ignored_file.write(word + '\n')
-            self.highlight_unknown()
-            self.text.yview_moveto(curr_view[0])
-    
-    def ignore_all(self, event=None):
-        curr_word = self.get_curr_word(self.text.index(tk.INSERT))
-        if not curr_word:
-            return
-        self.spellchecker.ignored_words.add(curr_word)
-        updated_words = []
-        for word in self.unknown_words:
-            if word[0] != curr_word:
-                updated_words.append(word)
-        self.unknown_words = updated_words
-        self.text.tag_remove("highlight", "1.0", tk.END)
-        self.text.tag_remove("selected", "1.0", tk.END)
-        updated_hlight = []
-        for (start_index, end_index) in self.highlight_indexes:
-            if self.text.get(start_index, end_index) != curr_word:
-                updated_hlight.append((start_index, end_index))
-        self.highlight_indexes = updated_hlight
-        self.highlight_unknown()
-        with open("ign_words.txt", 'at') as ignored_file:
-            ignored_file.write(curr_word+'\n')
-
     def get_next_unknown_start(self, from_index):
         next_index = self.text.search(r'\b[a-zA-Z]+\b', from_index, tk.END, regexp=True)
         while next_index:
@@ -661,57 +716,8 @@ class SpellcheckerApp:
             next_index = self.text.index(next_index + " wordend")
             next_index = self.text.search(r'\b[a-zA-Z]+\b', next_index + " +1c", tk.END, regexp=True)
         return None
-    
-    def accept_suggestion(self):
-        if self.curr_word_pos:
-            word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
-            if word:
-                suggestions = Suggester.get_suggestions(word, self.spellchecker.known_words) if word else []
-                self.suggestion_menu(word, suggestions)
-    
-    def suggestion_menu(self, unknown_word, suggestions):
-        self.menu.delete(0, tk.END)
-        if suggestions:
-            for suggestion in suggestions:
-                self.menu.add_command(label=suggestion, command=lambda s=suggestion: self.replace_unknown(unknown_word, s))
-        else:
-            self.menu.add_command(label="undetermined", command=tk.NONE)
-        x = self.text.winfo_pointerx()
-        y = self.text.winfo_pointery()
-        self.menu.tk_popup(x,y) #will need to check on this--not sure about it
-        
 
-    def get_a_suggestion(self, unknown_word, suggestion):
-        return lambda: self.replace_unknown(unknown_word, suggestion)
-
-    def replace_unknown(self, unknown_word, suggestion):
-        curr_view = self.text.yview()
-        curr_index = self.text.index(tk.INSERT)
-        start_index = self.text.search(unknown_word, "1.0", tk.END)
-        while start_index:
-            end_index = self.text.index("{}+{}c".format(start_index, len(unknown_word)))
-            curr_word = self.text.get(start_index, end_index)
-            if curr_word == unknown_word and self.text.tag_ranges("selected"):
-                start_word = self.text.index("selected.first")
-                end_word = self.text.index("selected.last")
-                if start_index == start_word and end_index == end_word:
-                    self.text.delete(start_index, end_index)
-                    self.text.insert(start_index, suggestion)
-                    self.update_known(unknown_word, suggestion)
-                    self.curr_word_pos = None
-                    break
-            start_index = self.text.search(unknown_word, end_index, tk.END)
-        self.text.yview_moveto(curr_view[0])
-        self.text.mark_set(tk.INSERT, curr_index)
-        self.text.see(curr_index)
-    
-    def update_known(self, prev, new):
-        if prev in self.unknown_words:
-            self.unknown_words.remove(prev)
-        self.spellchecker.ignored_words.discard(prev)
-        self.spellchecker.known_words.add(new)
-        self.highlight_unknown()
-
+#personal dictionary file
     def personal_dict(self):
         curr_view = self.text.yview()
         curr_index = self.text.index(tk.INSERT)
@@ -732,6 +738,7 @@ class SpellcheckerApp:
                     self.text.mark_set(tk.INSERT, curr_index)
                     self.text.see(curr_index)
 
+#application loop, command line
 if __name__ == "__main__":
     
     default_folder = os.path.dirname(os.path.abspath(__file__))
@@ -769,8 +776,8 @@ if __name__ == "__main__":
     spellchecker.ignored_words = load_files(ign_words_file_path)
     app = SpellcheckerApp(window, spellchecker)
     window.mainloop()
-#rest of globals
 
+###phrase entry, personal-use###
 #python "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\spellchecker.py"
 # --words "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\words.txt"
 # --pd "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\personal_dict.txt"
