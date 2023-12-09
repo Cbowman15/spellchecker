@@ -206,6 +206,7 @@ class SpellcheckerApp:
         self.text.focus_set()
 
     def refresh(self, event=None):
+        curr_index = self.text.index(tk.INSERT)
         start_index = self.text.index("sel.first")
         end_index = self.text.index("sel.last")
         selected = self.text.get(start_index, end_index)
@@ -214,6 +215,7 @@ class SpellcheckerApp:
         self.highlight_unknown()
         self.add_listbox()
         self.add_dict
+        self.text.see(curr_index)
 
 
     def open_file_one(self, file_to_open):
@@ -523,6 +525,7 @@ class SpellcheckerApp:
             self.current_unknown_index = (self.current_unknown_index+1) % (len(self.highlight_indexes))
             self.add_listbox()
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            self.text.see(start_index)
             self.set_insertion(start_index)
             for index, (start, end) in enumerate(self.highlight_indexes):
                 if index != self.current_unknown_index:
@@ -537,6 +540,7 @@ class SpellcheckerApp:
             self.text.tag_remove("selected", "1.0", tk.END)
             self.current_unknown_index = (self.current_unknown_index-1)%(len(self.highlight_indexes))
             (start_index, end_index) = self.highlight_indexes[self.current_unknown_index]
+            self.text.see(start_index)
             self.set_insertion(start_index)
             self.text.tag_remove("highlight", "1.0", tk.END)
             for index, (start, end) in enumerate(self.highlight_indexes):
@@ -702,7 +706,7 @@ class SpellcheckerApp:
                     self.spellchecker.known_words.add(new_word)
                     self.text.tag_remove("highlight", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
                     self.text.tag_remove("selected", self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
-                    with open(self.spellchecker.personal_dict_file_path, 'rt') as personal_dict_file:
+                    with open(self.spellchecker.personal_dict_file, 'rt') as personal_dict_file:
                         if new_word not in personal_dict_file:
                             with open(personal_dict_file_path, 'at') as personal_dict_file:
                                 personal_dict_file.write(new_word+'\n')
@@ -746,3 +750,9 @@ if __name__ == "__main__":
     app = SpellcheckerApp(window, spellchecker)
     window.mainloop()
 #rest of globals
+
+#python "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\spellchecker.py"
+# --words "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\words.txt"
+# --pd "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\personal_dict.txt"
+# --ignored "C:\Users\cb6f1\OneDrive\Desktop\Project\spellchecker\ign_words.txt"
+
