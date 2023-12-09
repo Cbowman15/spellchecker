@@ -730,8 +730,6 @@ if __name__ == "__main__":
         else:
             print("File: '{}' not found".format(file_path))
             return set()
-    
-    
             
 
     known_words_file_path = args.words
