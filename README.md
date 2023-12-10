@@ -39,7 +39,7 @@ In addition, the program uses the following Python Standard Library modules:
 -[USAGE](#usage)
 -[CONFIGURATION](#configuration)
 -[SUPPORTED FORMATS](#supported-formats)
--[COREDITS](#credits)
+-[CREDITS](#credits)
 
 ## INSTALLATION
 
@@ -142,6 +142,9 @@ To disable:
 ##### BENEFITS OF ARROW MODE
  - Faster workflow for spellchecking
  - Reduced mouse usage
+
+**Note: as the length of the file increases, the less responsive the program becomes during spell checks.**
+**However, the checks run successfully, despite length, given a wider time range.**
 
 ## CONFIGURATION
 Here is information to adjust the current program to meet your needs.
