@@ -569,7 +569,7 @@ class SpellcheckerApp:
         Arguments:
         -fill_to_open: a string of file path to be opened and read
         
-        Read:
+        Returns:
         -Nothing
         
         -If file ends with .txt, read as plain text
