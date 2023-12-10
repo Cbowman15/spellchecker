@@ -105,6 +105,7 @@ class Spellchecker():
         -The reference file should be initialized with text to be parsed
         -known_words should be populated with correctly-spelled words
         """
+        words_to_check = []
         try:
             words_to_check = self.reference_file.parse()
         except Exception as e:
@@ -120,7 +121,6 @@ class Spellchecker():
             except Exception as e:
                 print("Error in spellcheck, word-{}: {}".format(word,e))
                 
-
     def start_sentence(self, word_index, words_to_check):
         """
         Checks to see if a word is at the start of a sentence.
@@ -1793,6 +1793,18 @@ class SpellcheckerApp:
         except Exception as e:
             print("Error in personal_dict: {}".format(e))
 
+def load_files(file_path):
+    try:
+        if os.path.isfile(file_path):
+            with open(file_path, 'rt') as file:
+                return set(file.read().splitlines())
+        else:
+            print("File: '{}' not found".format(file_path))
+            return set()
+    except IOError as e:
+        print("Error reading the file-{}: {}".format(file_path,e))
+        return set()
+
 #application loop, command line
 if __name__ == "__main__":
     
@@ -1808,18 +1820,6 @@ if __name__ == "__main__":
     parser.add_argument("--pd", type=str, default=default_personal_dict_file, help="Path to personal dictionary file")
     parser.add_argument("--ex", type=str, default=default_txt_example_file, help="Path to example text file")
     args = parser.parse_args()
-
-    def load_files(file_path):
-        try:
-            if os.path.isfile(file_path):
-                with open(file_path, 'rt') as file:
-                    return set(file.read().splitlines())
-            else:
-                print("File: '{}' not found".format(file_path))
-                return set()
-        except IOError as e:
-            print("Error reading the file-{}: {}".format(file_path,e))
-            return set()
             
 
     known_words_file_path = args.words
