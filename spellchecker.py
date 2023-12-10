@@ -1356,7 +1356,8 @@ class SpellcheckerApp:
         change in the program upon refreshing.
         
         Arguments:
-        -event (Event, optional): Tkinter event that triggered function
+        -event (Event, optional): Tkinter event that triggered function. Defaulted
+         to None.
         
         Returns:
         -None
@@ -1442,6 +1443,16 @@ class SpellcheckerApp:
 
     def autofix_lang(self, typed_lang):
         """
+        Finds best match (of language, using fuzzywuzzy library) for string typed
+        into entry box, returning determined language code from LANGUAGES dictionary.
+        If no viable match can be found, the function defaults to English, showing
+        no change in the text.
+
+        Arguments:
+        -typed_lang (str): name of language typed by the user
+
+        Returns:
+        -str: string of language code that best matches typed_lang; defaulted to 'en'
         """
         try:
             lang = process.extractOne(typed_lang, LANGUAGES.values())
@@ -1457,6 +1468,19 @@ class SpellcheckerApp:
             print("Error in autofix_lang: {}".format(e))
 
     def translate(self, event=None):
+        """
+        Translates the currently selected text (system-highlighted) in the text
+        widget to the language entered into the entry widget. The library used
+        for translated is googletrans. After translation is completed, the selected
+        text will be replaced with the translated text.
+
+        Arguments:
+        -event (Event, optional): event object passed by the Tkinter event binding.
+         Defaulted to None.
+
+        Returns:
+        -"break" (str): prevents any further binding on the event from being processed
+        """
         try:
             self.lang_entry.pack(side=tk.TOP, fill=tk.X,padx=3,pady=3)
             self.btn_close_trans.pack(side=tk.BOTTOM, fill=tk.X,pady=3)
@@ -1480,6 +1504,17 @@ class SpellcheckerApp:
             print("Error in translate: {}".format(e))
     
     def open_trans(self, event=None):
+        """
+        Sets up interface for translation. Shows TRANSLATE and CLOSE TRANSLATE
+        buttons, shows entry bar for typing intended language.
+        
+        Arguments:
+        -event (Event, optional): event object passed by Tkinter event handling.
+         Defaulted to None.
+         
+        Returns:
+        -None
+        """
         try:
             self.lang_entry.pack(side=tk.TOP, fill=tk.X, padx=3,pady=3)
             self.btn_translate.pack(side=tk.TOP, padx=3,pady=3)
@@ -1489,6 +1524,16 @@ class SpellcheckerApp:
             print("Error in open_trans: {}".format(e))
 
     def close_trans(self):
+        """
+        Hides the TRANSLATE and CLOSE TRANSLATE buttons, as well as the 
+        entry bar, when called.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.lang_entry.pack_forget()
             self.btn_close_trans.pack_forget()
@@ -1499,6 +1544,16 @@ class SpellcheckerApp:
 
 #word handling for highlighting, etc.
     def get_curr_word(self, curr_index):
+        """
+        Gets current word, located at the specified index in the text widget.
+        (Strictly only that word, as specified by the regex word pattern).
+        
+        Arguments:
+        -curr_index (str): a string for the current index in the text
+        
+        Returns:
+        -Word at current index, as a string, else None
+        """
         try:
             start_word = self.text.search(r'\m', curr_index,backwards=True,regexp = True)
             end_word = self.text.search(r'\M', curr_index, regexp=True)
@@ -1509,6 +1564,15 @@ class SpellcheckerApp:
             print("Error in get_curr_word: {}".format(e))
 
     def get_cur_unknown(self):
+        """
+        Gets current unknown word from collection of unknown words, based on index.
+
+        Arguments:
+        -None
+
+        Returns:
+        -current unknown word (str), else None
+        """
         try:
             if not self.unknown_words or (self.current_unknown_index>=len(self.unknown_words)):
                 return None
@@ -1517,6 +1581,22 @@ class SpellcheckerApp:
             print("Error in get_cur_unknown: {}".format(e))
 
     def next_unknown(self):
+        """
+        Moves to the next unknown word in the text, either through navigation
+        by the NEXT button, or the right arrow key (if in arrow mode). Upon
+        moving, it changes the currently selected word a different color from
+        the rest of the unknown words.
+
+        Arguments:
+        -None
+
+        Returns:
+        -None
+
+        -Completely dependent on self.highlight_indexes and self.current_unknown_index
+         for features to work in text widget.
+        -Responsible for updates in self.add_listbox and self.set_insertion
+        """
         try:
             if self.highlight_indexes:
                 self.text.tag_config("highlight", background="yellow")
@@ -1540,6 +1620,22 @@ class SpellcheckerApp:
             print("Error in next_unknown: {}".format(e))
             
     def previous_unknown(self):
+        """
+        Moves to the previous unknown word in the text, either through navigation
+        with the PREVIOUS button, or the left arrow key (if in arrow mode). Upon
+        moving, it changes the currently selected word a different color from
+        the rest of the unknown words.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        
+        -Completely dependent on self.highlight_indexes and self.current_unknown_index
+         for features to work in text widget.
+        -Responsible for updates in self.add_listbox and self.set_insertion
+        """
         try:
             if self.highlight_indexes:
                 self.text.tag_remove("selected", "1.0", tk.END)
@@ -1559,6 +1655,19 @@ class SpellcheckerApp:
             print("Error in previous_unknown: {}".format(e))
 
     def hlight_word(self, word, line_start, now_known_indexes):
+        """
+        Highlights a given word in the text (by x.x position), recording its
+        index. The word is added to the list of unknown words, if not already in it.
+        
+        Arguments:
+        -word (str): word to be highlighted
+        -line_start (str): text index representing start of the line
+        -now_known_indexes (list): list, updated with start and end indexes
+         of the word
+        
+        Returns:
+        -None
+        """
         try:
             match = re.search(r'\b{}\b'.format(re.escape(word)), self.text.get(line_start, line_start+"lineend"))
             if match:
@@ -1572,6 +1681,19 @@ class SpellcheckerApp:
             print("Error in hlight_word: {}".format(e))
 
     def highlight_unknown(self):
+        """
+        Checks the entire text, highlighting unknown words (words not in spellchecker's
+        known words list, ignored words list). Ignores capitalization and punctuation
+        when checking.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        
+        -Binds mouse clicks to highlighted words for menu pop-up
+        """
         try:
             curr_time = time.time()
             if self.arrow_key_mode and (curr_time-self.arrow_last_time>self.arrow_time_reset):
@@ -1611,6 +1733,15 @@ class SpellcheckerApp:
             print("Error in highlight_unknown: {}".format(e))
 
     def get_next_unknown_start(self, from_index):
+        """
+        Finds the starting index of the next unknown word, starting at a given index.
+        
+        Arguments:
+        -from_index (str): text index from which search for next unknown word starts
+        
+        Returns:
+        -str: index of start of next unknown word, else None
+        """
         try:
             next_index = self.text.search(r'\b[a-zA-Z]+\b', from_index, tk.END, regexp=True)
             while next_index:
@@ -1624,6 +1755,19 @@ class SpellcheckerApp:
 
 #personal dictionary file
     def personal_dict(self):
+        """
+        Adds currently selected word, at the cursor position, to spellchecker's
+        known words, as well as personal dictionary file. Afterward, refreshes
+        view of text. Stores y-view and cursor position to make it seem as if
+        there were no apparent changes in the program.
+
+        Arguments:
+        -None
+
+        Returns:
+        -None
+        
+        """
         try:
             curr_view = self.text.yview()
             curr_index = self.text.index(tk.INSERT)
