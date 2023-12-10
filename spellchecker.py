@@ -960,7 +960,7 @@ class SpellcheckerApp:
         
         Arguments:
         -event (Event, optional): Tkinter event object that passes information into
-         the binding system for key releases.
+         the binding system for key releases. Defaulted to None.
          
         Returns:
         -None
@@ -1024,6 +1024,17 @@ class SpellcheckerApp:
             print("Error in save_undo: {}".format(e))
     
     def new_undo(self, event=None):
+        """
+        Reverts the text widget to a previous state, as recorded in the undo
+        history. Places cursor back at previous position as well. Updates both
+        undo_hist and redo_hist.
+        
+        Arguments:
+        -event (Event, optional): takes in event information. Defaulted to None.
+
+        Returns:
+        -"break" (str): prevents events from triggering functions outside of current
+        """
         try:
             if self.undo_hist:
                 current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
@@ -1037,6 +1048,19 @@ class SpellcheckerApp:
         return "break"
     
     def new_redo(self, event=None):
+        """
+        Restores the text widget to most recent saved-state in the redo history.
+        Can redo up until last discrete change. Additionally saves the position
+        of cursor from redo history.
+        
+        Arguments:
+        -event (Event, optional): event object passed by the Tkinter binding
+         (redo function). Defaulted to None.
+
+        Returns:
+        -"break" (str): to stop the event from triggering functions outside of the
+         current.
+        """
         try:
             if self.redo_hist:
                 current = (self.text.get("1.0", tk.END), self.text.index(tk.INSERT))
@@ -1050,6 +1074,15 @@ class SpellcheckerApp:
         return "break"
 
     def dict_off(self):
+        """
+        Hides the +Dictionary button and listbox from the window layout.
+
+        Arguments:
+        -None
+
+        Returns:
+        -None
+        """
         try:
             self.btn_dict.pack_forget()
             self.sug_listbox.pack_forget()
@@ -1057,6 +1090,15 @@ class SpellcheckerApp:
             print("Error in dict_off: {}".format(e))
     
     def dict_on(self):
+        """
+        Shows the +Dictionary and listbox on the window layout.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        """
         try:
             self.btn_dict.pack(side=tk.LEFT, padx=3, pady=3, anchor=tk.SW)
             self.sug_listbox.pack(side=tk.BOTTOM, padx=3,pady=3)
@@ -1064,6 +1106,21 @@ class SpellcheckerApp:
             print("Error in dict_on: {}".format(e))
     
     def add_dict(self):
+        """
+        Adds the current unknown word, at the mouse cursor, to a collection
+        of known words in the spellchecker. Updates the personal dictionary, and
+        refreshes text highlights. The current y-view, as well as the insertion
+        point is stored, allowing for no apparent program change.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        
+        -modifies spellchecker known words set
+        -modifies unknown words list
+        """
         try:
             curr_view = self.text.yview()
             curr_index = self.text.index(tk.INSERT)
@@ -1089,6 +1146,22 @@ class SpellcheckerApp:
             print("Error in add_dict: {}".format(e))
 
     def ignore_unknown(self):
+        """
+        Adds the current unknown word, at the mouse cursor, to the ignored words
+        set. Removes word from list of unknown words, and refreshes text highlights.
+        Stores y-view and cursor position to make it seem as if there was no program
+        change.
+        
+        Arguments:
+        -None
+        
+        Returns:
+        -None
+        
+        -removes word from unknown words list
+        -adds word to spellchecker ignored words set
+        -writes to ignored words file
+        """
         if not self.highlight_indexes:
             return
         try:
@@ -1114,6 +1187,22 @@ class SpellcheckerApp:
             print("Error in ignore_unknown: {}".format(e))
     
     def ignore_all(self, event=None):
+        """
+        Ignores all instances, within the text, of the unknown word at the
+        current cursor position. Updates ignored words file to include given word.
+        Refreshes text highlights. Stores y-view and cursor position to make it
+        seem as if there was no apparent program change.
+        
+        Arguments:
+        -event (Event, optional): a triggering event. Defaulted to None.
+        
+        Returns:
+        -None
+        
+        -adds current unknown word to spellchecker ignored words
+        -removes ignored word from unknown words
+        -writes ignored word to ign_words file
+        """
         try:
             curr_word = self.get_curr_word(self.text.index(tk.INSERT))
             if not curr_word:
@@ -1141,9 +1230,28 @@ class SpellcheckerApp:
             print("Error in ignore_all: {}".format(e))
 
     def get_a_suggestion(self, unknown_word, suggestion):
+        """
+        Replaces current unknown word with a suggestion, calling on the
+        replace_unknown function
+        
+        Arguments:
+        -unknown_word (str): string of word to be replaced
+        -suggestion (str): string of suggested replacement for unknown_word
+        """
         return lambda: self.replace_unknown(unknown_word, suggestion)
 
     def accept_suggestion(self):
+        """
+        Displays suggestion menu with correction options for currently selected word,
+        at the cursor position. Gets suggestions from the Suggester class, showing
+        them with the suggestion_menu function, inside of the show_menu function.
+
+        Arguments:
+        -None
+
+        Returns:
+        -None
+        """
         if self.curr_word_pos:
             try:
                 word = self.text.get(self.curr_word_pos+" wordstart", self.curr_word_pos+" wordend")
@@ -1154,6 +1262,18 @@ class SpellcheckerApp:
                 print("Error in accept_suggestion: {}".format(e))
 
     def replace_unknown(self, unknown_word, suggestion):
+        """
+        Replaces current instance of unknown word with a suggestion, if called.
+        Stores y-view and cursor position to make it seem as if there was no
+        apparent change in the program.
+        
+        Arguments:
+        -unknown_word (str): a string in text, marked as unknown
+        -suggestion (str): a string to replace the unknown_word
+        
+        Returns:
+        -None
+        """
         try:
             curr_view = self.text.yview()
             curr_index = self.text.index(tk.INSERT)
@@ -1178,6 +1298,18 @@ class SpellcheckerApp:
             print("Error in replace_unknown: {}".format(e))
 
     def update_known(self, prev, new):
+        """
+        Updates known words set to include current word, while also
+        removing the word from the unknown words list. Refreshes highlights
+        for unknown words, highlighting all current unknown words.
+
+        Arguments:
+        -prev (str): unknown word to be updated
+        -new (str): previously unknown word, now excluded from further checks
+
+        Returns:
+        -None
+        """
         try:
             if prev in self.unknown_words:
                 self.unknown_words.remove(prev)
@@ -1189,6 +1321,18 @@ class SpellcheckerApp:
             print("Error while updating known words: {}".format(e))
 
     def suggestion_menu(self, unknown_word, suggestions):
+        """
+        Displays a menu with three options for word suggestions, which are
+        similarly spelled as the unknown word. Selecting such a word will replace
+        the unknown word.
+        
+        Arguments:
+        -unknown_word (str): word in text marked as misspelled
+        -suggestions (str list): list of suggestions for replacement of unknown_word
+        
+        Returns:
+        -None
+        """
         try:
             self.menu.delete(0, tk.END)
             if suggestions:
@@ -1203,6 +1347,20 @@ class SpellcheckerApp:
             print("Error in suggestion_menu: {}".format(e))
 
     def chosen_listbox(self, event):
+        """
+        *Selection is currently disabled, but left for future use*. Handles the
+        event in which the user chooses a suggestion from the listbox to replace
+        a current, unknown word. Only available while in arrow mode. Updates with
+        navigation, showing three suggestions for currently selected word. Stores
+        y-view and cursor position so that it seems as if there is no apparent
+        change in the program upon refreshing.
+        
+        Arguments:
+        -event (Event, optional): Tkinter event that triggered function
+        
+        Returns:
+        -None
+        """
         try:
             curr_view = self.text.yview()
             curr_index = self.text.index(tk.INSERT)
@@ -1225,6 +1383,22 @@ class SpellcheckerApp:
             print("Error in chosen_listbox: {}".format(e))
 
     def add_listbox(self):
+        """
+        Populates the listbox, which only appears in arrow mode, with three
+        suggestions for the currently unknown word. The said suggestions are
+        words that are similarly spelled as the unknown word. Suggestions change
+        with navigation while in arrow mode.
+
+        Arguments:
+        -None
+
+        Returns:
+        -None
+
+        -listbox display for unknown words are stored as tuples, with list of suggestions
+         ex. (word, [suggestions])
+        -handles event in which there are no unknown words, wiping clean the listbox
+        """
         try:
             self.sug_listbox.delete(0, tk.END)
             if self.current_unknown_index<(len(self.unknown_words)):
@@ -1237,6 +1411,17 @@ class SpellcheckerApp:
             print("Error in add_listbox: {}".format(e))
 
     def show_menu(self, event):
+        """
+        Displays menu when user right clicks on an unknown word in text. The
+        menu options include 'ignore', 'get suggestions', and '+personal dict'.
+
+        Arguments:
+        -event (Event, optional): event object, containing x- and y-coordinates
+         of mouse click, allowing for a correct placement of menu. Defaulted to None.
+
+        Returns:
+        -None
+        """
         try:
             curr_index = self.text.index(tk.CURRENT)
             word = self.text.get(curr_index + " wordstart", curr_index + " wordend")
@@ -1256,6 +1441,8 @@ class SpellcheckerApp:
             print("Error in show_menu: {}".format(e))
 
     def autofix_lang(self, typed_lang):
+        """
+        """
         try:
             lang = process.extractOne(typed_lang, LANGUAGES.values())
             if lang:
