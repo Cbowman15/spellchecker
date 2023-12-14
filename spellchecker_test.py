@@ -10,6 +10,15 @@ personal_dict_file_path = "C:\\Users\\cb6f1\\OneDrive\\Desktop\\Project\\spellch
 ignored_words_file_path = "C:\\Users\\cb6f1\\OneDrive\\Desktop\\Project\\spellchecker\\ign_words.txt"
 
 class TestSpellchecker(unittest.TestCase):
+    def test__init__(self):
+        reference_file = TextFile("I'm done and out for break.")
+        known_words_file_path = "known_words.txt"
+        personal_dict_file_path = "pers_dict.txt"
+        ignored_words_file_path = "ign_words.txt"
+        spellchecker = Spellchecker(reference_file, known_words_file_path, personal_dict_file_path, ignored_words_file_path)
+        assert spellchecker.known_words == set()
+        assert spellchecker.unknown_words == []
+        
     def test_spell_check_unknown(self):
         class MockReferenceFile:
             def parse(self):
