@@ -240,6 +240,7 @@ class Suggester():
          to empty set
          """
         self.known_words = known_words or set()
+
     def checker(self, word):
         """
         Checks if word is in known words set.
@@ -270,6 +271,7 @@ class TextFile(ReferenceFile):
         Initializes parent class with text.
         """
         super().__init__(text)
+
     def parse(self):
         """
         Parses file contents into list of words, splitting at whitespace.
@@ -294,6 +296,7 @@ class HTMLFile(ReferenceFile):
         -text (str): string containing HTML content
         """
         super().__init__(text)
+
     def parse(self):
         """
         Parses HTML content, extracting text, returning list of words.
@@ -323,6 +326,7 @@ class PDFFile(ReferenceFile):
         """
         super().__init__(None)
         self.file_path = file_path
+
     def parse(self):
         """
         Opens PDF file, extracting text from each page, combining it into one string.
@@ -353,6 +357,7 @@ class DocxFile(ReferenceFile):
         -file_path (str): file path to .docx file
         """
         super().__init__(text)
+        
     def parse(self):
         """
         Opens .docx file, extracting text from each paragraph into single list.
